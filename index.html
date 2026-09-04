@@ -1,0 +1,1143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>Scouter v6 — live map</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" onerror="window.__leafletFailed = true"></script>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: #0f1418; color: #e6e9ec; font: 14px/1.35 system-ui, -apple-system, sans-serif; overflow: hidden; }
+  #app { display: flex; flex-direction: column; height: 100%; }
+  #hud { padding: 6px 10px; background: #161d23; border-bottom: 1px solid #263039; }
+  #hud .region { font-size: 17px; font-weight: 600; }
+  #hud .line { font-size: 12.5px; color: #b7c0c8; margin-top: 1px; }
+  #hud .line b { color: #fff; font-weight: 600; }
+  #arena { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+  canvas { display: block; width: 100%; height: 100%; }
+  #osm { position: absolute; inset: 0; background: #0f1418; }
+  #osm.hidden, #map.hidden { display: none; }
+  .leaflet-container { background: #1a2128; font: inherit; }
+  .leaflet-control-attribution { font-size: 9px; background: rgba(15,20,24,.7) !important; color: #9aa6b0 !important; }
+  .leaflet-control-attribution a { color: #bcd !important; }
+  #flash { position: absolute; left: 10px; right: 10px; top: 60px; background: rgba(29,38,46,.95); border: 1px solid #34424d; border-radius: 8px; padding: 8px 10px; font-size: 12.5px; display: none; z-index: 1000; }
+  #flash.show { display: block; }
+  #gpsBig { position: absolute; left: 10px; right: 10px; bottom: 10px; z-index: 1000; display: none; background: #2b6a49; border-color: #3f9a6a; }
+  #gpsBig.show { display: block; }
+  #centerBtn { position: absolute; right: 10px; bottom: 10px; z-index: 1000; min-height: 36px; padding: 0 10px; font-size: 12px; display: none; }
+  #centerBtn.show { display: block; }
+  .pad.hidden { display: none; }
+  #gymBtn { position: absolute; left: 10px; right: 10px; top: 10px; z-index: 1000; display: none; background: #2b6a49; border-color: #3f9a6a; }
+  #gymBtn.show { display: block; }
+  #gymBtn.locked { background: #4a3a2a; border-color: #7a5a3a; }
+  #toast { position: absolute; left: 8px; right: 8px; bottom: 8px; z-index: 1001; background: #1d262e; border: 1px solid #34424d; border-radius: 10px; padding: 9px 10px; display: none; max-height: 92%; overflow-y: auto; }
+  #toast.show { display: block; }
+  #toast::after { content: ""; display: block; clear: both; }
+  #toast .sp { font-size: 15px; font-weight: 600; }
+  #toast .meta { color: #b7c0c8; font-size: 12.5px; margin-top: 3px; }
+  #toast .acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; clear: both; }
+  #toast .acts button { flex: 1 1 30%; min-height: 40px; font-size: 13px; }
+  #toast .row2 { display: grid; grid-template-columns: 1fr 90px 60px; gap: 6px; align-items: center; margin: 3px 0; }
+  #toast img.foe { float: right; width: 72px; height: 72px; image-rendering: pixelated; margin-left: 8px; object-fit: contain; }
+  #toast img.leader { float: right; width: 64px; height: 88px; margin-left: 8px; object-fit: contain; }
+  .hpb { height: 8px; background: #2a343d; border-radius: 4px; overflow: hidden; } .hpf { height: 100%; }
+  #toast .log { color: #d6dde3; font-size: 12px; margin: 4px 0; border-left: 2px solid #34424d; padding-left: 6px; }
+  #panel { position: absolute; inset: 0; z-index: 1002; background: #0f1418; overflow-y: auto; padding: 10px; display: none; }
+  #panel.show { display: block; }
+  #panel .ph2 { font-weight: 600; margin: 8px 0 4px; color: #b7c0c8; }
+  .mon { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid #222c34; }
+  .mon img, .mon .ph { width: 40px; height: 40px; image-rendering: pixelated; background: #1d262e; border-radius: 6px; flex: 0 0 40px; object-fit: contain; }
+  .mon .nm { flex: 1; } .mon small { color: #8f9aa4; } .mon button { min-height: 36px; padding: 0 10px; }
+  .badge { display: inline-flex; align-items: center; gap: 6px; background: #1d262e; border: 1px solid #34424d; border-radius: 8px; padding: 4px 8px; margin: 3px 4px 3px 0; font-size: 12.5px; }
+  .badge img { width: 22px; height: 22px; image-rendering: pixelated; }
+  #bar { background: #161d23; border-top: 1px solid #263039; padding: 8px 10px 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  #bar .stack.wide { grid-column: 1 / -1; flex-direction: row; } #bar .stack.wide button { flex: 1; }
+  #bar .row { grid-column: 1 / -1; display: flex; gap: 6px; }
+  #bar .row button { flex: 1; min-height: 40px; font-size: 13px; }
+  .pad { display: grid; grid-template-columns: repeat(3, 48px); grid-template-rows: repeat(3, 48px); gap: 4px; justify-content: center; }
+  .pad button { width: 48px; height: 48px; }
+  .stack { display: flex; flex-direction: column; gap: 6px; justify-content: center; }
+  button { min-height: 44px; border: 1px solid #3a4956; border-radius: 9px; background: #222d36; color: #e6e9ec; font-size: 14px; font-weight: 600; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+  button:active { background: #33434f; }
+  button:disabled { opacity: .45; }
+  button.on { background: #2b6a49; border-color: #3f9a6a; }
+  button.hidden { visibility: hidden; }
+  #note { grid-column: 1 / -1; font-size: 11px; color: #7f8b95; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="hud">
+    <div class="region" id="hRegion">—</div>
+    <div class="line" id="hRoute">—</div>
+    <div class="line" id="hGym">—</div>
+    <div class="line" id="hPos">—</div>
+  </div>
+  <div id="arena">
+    <div id="osm"></div>
+    <canvas id="map" class="hidden"></canvas>
+    <button id="gymBtn"></button>
+    <div id="flash"></div>
+    <button id="gpsBig">📍 Enable live GPS</button>
+    <button id="centerBtn">⌖ Centre on me</button>
+    <div id="toast"><img id="tImg" class="foe" alt="" style="display:none"><div class="sp" id="tSp"></div><div class="meta" id="tMeta"></div><div class="acts" id="tActs"></div></div>
+    <div id="panel">
+      <div class="ph2">Team <button id="heal" style="float:right;min-height:32px;padding:0 10px">Heal all (free, stub)</button></div><div id="pTeam"></div>
+      <div class="ph2">Box</div><div id="pBox"></div>
+      <div class="ph2">Badges</div><div id="pBadges" class="meta"></div>
+      <div class="ph2">Bag</div><div id="pBag" class="meta"></div>
+    </div>
+  </div>
+  <div id="bar">
+    <div class="pad hidden" id="pad">
+      <button class="hidden"></button><button data-d="n">▲</button><button class="hidden"></button>
+      <button data-d="w">◀</button><button id="speed">walk</button><button data-d="e">▶</button>
+      <button class="hidden"></button><button data-d="s">▼</button><button class="hidden"></button>
+    </div>
+    <div class="stack" id="stack">
+      <button id="scan">Scan route</button>
+      <button id="team">Team</button>
+      <button id="zoom">Region view</button>
+    </div>
+    <div class="row">
+      <button id="viewMode">Map</button>
+      <button id="squares">Squares: on</button>
+      <button id="gps">Live GPS</button>
+    </div>
+    <div class="row">
+      <button id="loadBin">Load .bin</button>
+      <button id="load">Load folder</button>
+      <button id="reset">Reset</button>
+      <input id="packFiles" type="file" multiple style="display:none" webkitdirectory>
+      <input id="packBin" type="file" style="display:none">
+    </div>
+    <div id="note">Pack: <span id="packName">demo fixture</span>. Map tiles © OpenStreetMap contributors. Balance is a stub.</div>
+  </div>
+  </div>
+</div>
+
+<script>
+/* CORE-START */
+// ===== Tunables (world scale) =====
+// ASSUMPTION: the original app's scale is unknown; these are starting guesses for the phone playtest.
+const WORLD = {
+  SEED: 20260903,
+  LAT_STEP: 0.003,   // one route ≈ 334 m north–south
+  LON_STEP: 0.004,   // one route ≈ 323 m east–west at 43.5°N
+  MACRO: 4,          // routes per macro-area side  → macro-area ≈ 1.3 km square
+  REGION: 3,         // macro-areas per region side → region ≈ 4 km square, 9 macro-areas, centre = league
+  LEGENDARY_MIN_BADGES: 6,
+  LEGENDARY_ODDS: 512,
+};
+// ===== Gym tunables =====
+const GYM = {
+  BASE_LEVEL: 8, PER_BADGE: 5,          // leader level = 8 + 5 × total badges (rematches scale with you)
+  ACE_BONUS: 3,                         // ace sits above the rest of the team
+  TEAM_MIN: 2, BADGES_PER_SLOT: 2,      // team size = 2 + badges/2, capped at 6
+  LEAGUE_BASE: 45, LEAGUE_PER_BADGE: 3, // champion level
+  REGION_BADGES_FOR_LEAGUE: 8,
+};
+
+// ===== Deterministic hashing =====
+function hash32(...ints) {
+  let h = 0x9e3779b9 ^ WORLD.SEED;
+  for (const v of ints) {
+    let x = (v | 0) * 0x27d4eb2d;
+    x ^= x >>> 15; x = Math.imul(x, 0x85ebca6b); x ^= x >>> 13;
+    h ^= x; h = Math.imul(h, 0xc2b2ae35); h ^= h >>> 16;
+  }
+  return h >>> 0;
+}
+function strHash(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+function rng(seed) { // mulberry32
+  let a = seed >>> 0;
+  return function () {
+    a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function floorDiv(a, b) { return Math.floor(a / b); }
+function mod(a, b) { return ((a % b) + b) % b; }
+function weightedPick(cum, r) { // cum: cumulative weights; r in [0,1)
+  const x = r * cum[cum.length - 1];
+  let lo = 0, hi = cum.length - 1;
+  while (lo < hi) { const mid = (lo + hi) >> 1; if (cum[mid] > x) hi = mid; else lo = mid + 1; }
+  return lo;
+}
+
+// ===== Geometry =====
+function routeCell(lat, lon) { return { rx: Math.floor(lon / WORLD.LON_STEP), ry: Math.floor(lat / WORLD.LAT_STEP) }; }
+function cellBounds(rx, ry) { return { lat0: ry * WORLD.LAT_STEP, lat1: (ry + 1) * WORLD.LAT_STEP, lon0: rx * WORLD.LON_STEP, lon1: (rx + 1) * WORLD.LON_STEP }; }
+function cellCenter(rx, ry) { return { lat: (ry + 0.5) * WORLD.LAT_STEP, lon: (rx + 0.5) * WORLD.LON_STEP }; }
+function macroOf(rx, ry) { return { mx: floorDiv(rx, WORLD.MACRO), my: floorDiv(ry, WORLD.MACRO) }; }
+function regionOf(mx, my) { return { gx: floorDiv(mx, WORLD.REGION), gy: floorDiv(my, WORLD.REGION) }; }
+function macroIndex(mx, my) { return mod(mx, WORLD.REGION) + WORLD.REGION * mod(my, WORLD.REGION); }
+const LEAGUE_INDEX = Math.floor((WORLD.REGION * WORLD.REGION) / 2);
+function routeNumber(rx, ry) { const side = WORLD.MACRO * WORLD.REGION; return mod(rx, side) + side * mod(ry, side) + 1; }
+function regionKey(gx, gy) { return gx + ',' + gy; }
+function haversineM(lat1, lon1, lat2, lon2) {
+  const R = 6371000, toR = Math.PI / 180;
+  const dLat = (lat2 - lat1) * toR, dLon = (lon2 - lon1) * toR;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * toR) * Math.cos(lat2 * toR) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+function bearingDeg(lat1, lon1, lat2, lon2) {
+  const toR = Math.PI / 180, y = Math.sin((lon2 - lon1) * toR) * Math.cos(lat2 * toR);
+  const x = Math.cos(lat1 * toR) * Math.sin(lat2 * toR) - Math.sin(lat1 * toR) * Math.cos(lat2 * toR) * Math.cos((lon2 - lon1) * toR);
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+}
+function compass(deg) { return ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.round(deg / 45) % 8]; }
+
+// ===== Region names =====
+const NAME_BLOCKLIST = ['kanto', 'johto', 'hoenn', 'sinnoh', 'unova', 'kalos', 'alola', 'galar', 'paldea', 'hisui', 'orre', 'fiore', 'almia', 'oblivia', 'ransei', 'lental', 'kitakami'];
+const SYL_A = ['Kan', 'Jo', 'Ho', 'Sin', 'Un', 'Kal', 'Al', 'Pal', 'Gal', 'Hi', 'Ve', 'Or', 'Tem', 'Ash', 'Mar', 'Rin', 'Sol', 'Var', 'Ny', 'Tor', 'Bel', 'Cor', 'Del', 'Fen', 'Lu', 'Mi', 'Sa', 'Ta'];
+const SYL_B = ['ra', 'lo', 'na', 'vi', 'te', 'ki', 'mo', 'su', 'ri', 'da', 'ne', 'go'];
+const SYL_C = ['to', 'en', 'oh', 'ar', 'os', 'dea', 'ia', 'ova', 'um', 'or', 'is', 'ai', 'ul', 'ith', 'an'];
+function regionName(gx, gy) {
+  const n = PACK.naming;
+  const A = n ? n.prefixes : SYL_A, B = n ? (n.middles || []) : SYL_B, C = n ? n.suffixes : SYL_C;
+  const block = (n ? (n.blocklist || []) : NAME_BLOCKLIST).map(x => x.toLowerCase());
+  const r = rng(hash32(gx, gy, 101));
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const three = B.length > 0 && r() < 0.4;
+    let name = A[Math.floor(r() * A.length)];
+    if (three) name += B[Math.floor(r() * B.length)];
+    name += C[Math.floor(r() * C.length)];
+    if (!block.includes(name.toLowerCase())) return name;
+  }
+  return 'Region ' + gx + ',' + gy;
+}
+
+// ===== Pack model =====
+// Two on-disk formats load into one compiled model:
+//   scouter-pack/1  (this project's JSON schema; supports battle.mode "light" or "full")
+//   GMS .bin        (Tankenka's GPS Monster Scouter pack: JSON + base64 images + trailing signature; always light mode)
+// Compiled PACK: { meta, source, mode, types, typeChart, movesById, speciesById, habitats, rares, gyms, images, naming, keywords }
+//   habitats: route population pools  [{ id, name, color, types:Set, members:[{id,min,max}], diffusion }]
+//   gyms:     gym/badge pool (≥ 8)     [{ id, name, color, type, leaders:[names], leaderImages:[names], badges:[{name,icon}] }]
+//   rares:    per-route rare pools     [{ id, name, members:[{id,minlvl}] }]
+
+const DEMO_PACK = { // engine test fixture only — not a roster
+  format: 'scouter-pack/1', name: 'Demo fixture', author: 'engine', version: '1',
+  families: ['Ember', 'Tide', 'Bloom', 'Spark', 'Frost', 'Stone', 'Gale', 'Venom', 'Psyche', 'Shade', 'Iron', 'Fae'].map((n, i) => ({ id: n.toLowerCase(), name: n, color: ['#e0603a', '#3a8fe0', '#5cbf4a', '#e8c33a', '#8fd6ee', '#a58a66', '#b9c7d6', '#a05cd6', '#ee7ac8', '#5a5f7a', '#8c98a4', '#f4a6c6'][i] })),
+  species: [],
+  leaders: ['Adaora', 'Bashir', 'Cato', 'Dilnaz', 'Emeric', 'Farah', 'Gulzar', 'Hiro', 'Ilse', 'Jamal', 'Kenji', 'Laila', 'Mattias', 'Noor', 'Orla', 'Pavel', 'Qasim', 'Rania', 'Soren', 'Tariq'],
+};
+DEMO_PACK.families.forEach(f => { for (let st = 1; st <= 3; st++) DEMO_PACK.species.push({ id: f.id + st, name: f.name + ' ' + 'I II III'.split(' ')[st - 1], family: f.id, stage: st, evolvesTo: st < 3 ? [f.id + (st + 1)] : [], evolveLevel: st < 3 ? 14 + 16 * (st - 1) : null, sprite: null, legendary: false }); });
+DEMO_PACK.species.push({ id: 'leg1', name: 'Demo Legend', family: 'psyche', stage: 3, evolvesTo: [], evolveLevel: null, sprite: null, legendary: true });
+
+const DEFAULT_LEADERS = ['Leader'];
+function validatePack(p) {
+  const errors = [];
+  if (!p || typeof p !== 'object') return { ok: false, errors: ['pack is not an object'] };
+  if (p.format !== 'scouter-pack/1') errors.push('format must be "scouter-pack/1"');
+  if (!Array.isArray(p.families) || p.families.length < 8) errors.push('families: need at least 8');
+  const famIds = new Set();
+  (p.families || []).forEach((f, i) => {
+    if (!f || typeof f.id !== 'string' || !f.id) errors.push('families[' + i + ']: missing id');
+    else if (famIds.has(f.id)) errors.push('families: duplicate id "' + f.id + '"'); else famIds.add(f.id);
+    if (!f || typeof f.name !== 'string') errors.push('families[' + i + ']: missing name');
+    if (!f || !/^#[0-9a-fA-F]{6}$/.test(f.color || '')) errors.push('families[' + i + ']: color must be #rrggbb');
+  });
+  if (!Array.isArray(p.species) || p.species.length === 0) errors.push('species: need at least 1');
+  const spIds = new Set(); const stage1ByFam = new Map();
+  (p.species || []).forEach((s, i) => {
+    if (!s || typeof s.id !== 'string' || !s.id) { errors.push('species[' + i + ']: missing id'); return; }
+    if (spIds.has(s.id)) errors.push('species: duplicate id "' + s.id + '"'); else spIds.add(s.id);
+    if (typeof s.name !== 'string') errors.push('species ' + s.id + ': missing name');
+    if (!famIds.has(s.family)) errors.push('species ' + s.id + ': unknown family "' + s.family + '"');
+    if (![1, 2, 3].includes(s.stage)) errors.push('species ' + s.id + ': stage must be 1, 2 or 3');
+    if (s.stage === 1 && !s.legendary) stage1ByFam.set(s.family, (stage1ByFam.get(s.family) || 0) + 1);
+    if (s.sprite != null && typeof s.sprite !== 'string') errors.push('species ' + s.id + ': sprite must be a filename or null');
+  });
+  (p.species || []).forEach(s => (s && Array.isArray(s.evolvesTo) ? s.evolvesTo : []).forEach(t => { if (!spIds.has(t)) errors.push('species ' + s.id + ': evolvesTo unknown id "' + t + '"'); }));
+  famIds.forEach(id => { if (!stage1ByFam.get(id)) errors.push('family "' + id + '": needs at least one non-legendary stage-1 species'); });
+  if (p.naming) for (const k of ['prefixes', 'suffixes']) if (!Array.isArray(p.naming[k]) || p.naming[k].length < 4) errors.push('naming.' + k + ': need at least 4 syllables');
+  const mode = (p.battle && p.battle.mode) || 'light';
+  if (!['light', 'full'].includes(mode)) errors.push('battle.mode must be "light" or "full"');
+  if (mode === 'full') {
+    const typeIds = new Set();
+    if (!Array.isArray(p.types) || p.types.length < 2) errors.push('full battle: types: need at least 2');
+    (p.types || []).forEach((t, i) => { if (!t || typeof t.id !== 'string') errors.push('types[' + i + ']: missing id'); else typeIds.add(t.id); });
+    if (!p.typeChart || typeof p.typeChart !== 'object') errors.push('full battle: typeChart required');
+    else for (const [atk, row] of Object.entries(p.typeChart)) {
+      if (!typeIds.has(atk)) errors.push('typeChart: unknown attacking type "' + atk + '"');
+      for (const [def, mult] of Object.entries(row || {})) { if (!typeIds.has(def)) errors.push('typeChart.' + atk + ': unknown defending type "' + def + '"'); if (typeof mult !== 'number' || mult < 0) errors.push('typeChart.' + atk + '.' + def + ': multiplier must be a number ≥ 0'); }
+    }
+    const moveIds = new Set(); const damaging = new Set();
+    if (!Array.isArray(p.moves) || p.moves.length === 0) errors.push('full battle: moves: need at least 1');
+    (p.moves || []).forEach((m, i) => {
+      if (!m || typeof m.id !== 'string') { errors.push('moves[' + i + ']: missing id'); return; }
+      if (moveIds.has(m.id)) errors.push('moves: duplicate id "' + m.id + '"'); moveIds.add(m.id);
+      if (!typeIds.has(m.type)) errors.push('move ' + m.id + ': unknown type "' + m.type + '"');
+      if (!['physical', 'special', 'status'].includes(m.category)) errors.push('move ' + m.id + ': category must be physical, special or status');
+      if (m.category !== 'status') { if (!(m.power > 0)) errors.push('move ' + m.id + ': damaging move needs power > 0'); else damaging.add(m.id); }
+      if (m.accuracy != null && !(m.accuracy > 0 && m.accuracy <= 100)) errors.push('move ' + m.id + ': accuracy must be 1..100 or null (never misses)');
+      if (!(m.pp > 0)) errors.push('move ' + m.id + ': pp must be > 0');
+    });
+    (p.species || []).forEach(sp => {
+      if (!sp || typeof sp.id !== 'string') return;
+      if (!Array.isArray(sp.types) || sp.types.length < 1 || sp.types.length > 2 || !sp.types.every(t => typeIds.has(t))) errors.push('species ' + sp.id + ': types must be 1–2 known type ids');
+      const st = sp.stats || {};
+      for (const k of ['hp', 'atk', 'def', 'spa', 'spd', 'spe']) if (!(Number.isInteger(st[k]) && st[k] > 0)) errors.push('species ' + sp.id + ': stats.' + k + ' must be a positive integer');
+      if (!Array.isArray(sp.learnset) || !sp.learnset.length) { errors.push('species ' + sp.id + ': learnset required'); return; }
+      let earlyDamaging = false;
+      sp.learnset.forEach(l => { if (!l || !moveIds.has(l.move)) errors.push('species ' + sp.id + ': learnset unknown move "' + (l && l.move) + '"'); else if (!(Number.isInteger(l.level) && l.level >= 1)) errors.push('species ' + sp.id + ': learnset level must be ≥ 1'); else if (l.level <= 5 && damaging.has(l.move)) earlyDamaging = true; });
+      if (!earlyDamaging) errors.push('species ' + sp.id + ': needs a damaging move learnable by level 5');
+    });
+  }
+  return { ok: errors.length === 0, errors };
+}
+function isGmsPack(p) { return !!(p && typeof p === 'object' && typeof p.packName === 'string' && p.data && p.data.monsters && p.data.families); }
+function validateGmsPack(p) {
+  const errors = [];
+  if (!isGmsPack(p)) return { ok: false, errors: ['not a GMS pack (needs packName + data.monsters + data.families)'] };
+  const d = p.data;
+  if (!d.types || Object.keys(d.types).length < 8) errors.push('GMS pack: need at least 8 types (they become the gyms)');
+  const monIds = new Set(Object.keys(d.monsters));
+  for (const [id, m] of Object.entries(d.monsters)) { if (!Array.isArray(m.forms) || !m.forms.length) errors.push('monster ' + id + ': no forms'); }
+  (d.families || []).forEach((f, i) => { if (!Array.isArray(f.members) || !f.members.length) errors.push('families[' + i + ']: no members'); else f.members.forEach(m => { if (!monIds.has(m.id)) errors.push('families[' + i + ']: unknown monster "' + m.id + '"'); }); });
+  return { ok: errors.length === 0, errors };
+}
+function finishCompile(c) {
+  // cumulative diffusion tables: global, and per gym type (habitats containing that type)
+  c.habCum = []; let acc = 0; c.habitats.forEach(h => { acc += (h.diffusion > 0 ? h.diffusion : 1); c.habCum.push(acc); });
+  c.habByType = new Map();
+  c.gyms.forEach(g => {
+    const idx = [], cum = []; let a = 0;
+    c.habitats.forEach((h, i) => { if (h.types.has(g.type)) { idx.push(i); a += (h.diffusion > 0 ? h.diffusion : 1); cum.push(a); } });
+    c.habByType.set(g.type, { idx, cum });
+  });
+  return c;
+}
+function powerFromStage(sp) { return sp.legendary ? 4 : Math.max(0, (sp.stage || 1) - 1); }
+function compileScouter(p) {
+  const byFamIdx = new Map(p.families.map((f, i) => [f.id, i]));
+  const c = {
+    meta: { id: 'scouter:' + p.name, name: p.name, author: p.author, version: p.version }, source: 'scouter',
+    mode: (p.battle && p.battle.mode) || 'light',
+    types: (p.types || p.families).map(t => ({ id: t.id, name: t.name, color: t.color || null })),
+    typeChart: p.typeChart || {}, movesById: new Map((p.moves || []).map(m => [m.id, m])),
+    speciesById: new Map(), habitats: [], rares: [], gyms: [], images: new Map(),
+    naming: p.naming || null, keywords: { monster: 'monster', catchitem: 'Snare' },
+  };
+  const leaders = (Array.isArray(p.leaders) && p.leaders.length) ? p.leaders : DEFAULT_LEADERS;
+  p.families.forEach((f, i) => {
+    c.habitats.push({ id: f.id, name: f.name, color: f.color, types: new Set([f.id]), members: [], diffusion: 1 });
+    c.gyms.push({ id: f.id, name: f.name, color: f.color, type: f.id, leaders, leaderImages: [], badges: [{ name: f.name + ' Badge', icon: null }] });
+  });
+  p.species.forEach(s => {
+    const fi = byFamIdx.get(s.family);
+    const sp = { id: s.id, name: s.name, types: s.types && s.types.length ? s.types : [s.family], stage: s.stage, power: s.power != null ? s.power : powerFromStage(s), sprite: s.sprite, icon: s.sprite, legendary: !!s.legendary, evolvesTo: s.evolvesTo || [], evolveLevel: s.evolveLevel ?? null, stats: s.stats || null, learnset: s.learnset || null, familyIndex: fi };
+    c.speciesById.set(s.id, sp);
+    if (s.legendary) c.rares.push({ id: s.id, name: s.name, members: [{ id: s.id, minlvl: 50 }] });
+  });
+  // member level ranges from stages/evolve levels: stage1 [1, L1+4], stage2 [L1, L2+4], stage3 [L2, 100]
+  c.habitats.forEach((h, fi) => {
+    const sps = [...c.speciesById.values()].filter(s => s.familyIndex === fi && !s.legendary).sort((a, b) => a.stage - b.stage);
+    sps.forEach(s => {
+      const prev = sps.filter(x => x.evolvesTo.includes(s.id))[0];
+      const min = prev && prev.evolveLevel ? prev.evolveLevel : 1;
+      const max = s.evolveLevel ? Math.min(100, s.evolveLevel + 4) : 100;
+      h.members.push({ id: s.id, min, max });
+    });
+  });
+  return finishCompile(c);
+}
+function gmsForm(m) { return m.forms.find(f => !f.conditions) || m.forms[0]; }
+function compileGms(p) {
+  const d = p.data, suffix = d.imageSuffix || '.png';
+  const c = {
+    meta: { id: 'gms:' + p.packName, name: p.packPublicName || p.packName, author: 'GMS pack ' + p.packName, version: p.versionName || String(p.versionNumber || '') }, source: 'gms', mode: 'light',
+    types: [], typeChart: {}, movesById: new Map(), speciesById: new Map(), habitats: [], rares: [], gyms: [], images: new Map(),
+    naming: null, keywords: { monster: (d.keywords && d.keywords.monster) || 'monster', catchitem: (d.keywords && d.keywords.catchitem) || 'Snare' },
+  };
+  const RESERVED = new Set(['name', 'short', 'color', 'trainers', 'trainersImages', 'badges', 'tiles', 'items']);
+  for (const [id, t] of Object.entries(d.types)) {
+    c.types.push({ id, name: t.name || id, color: t.color || '#888888' });
+    const row = {}; for (const [k, v] of Object.entries(t)) if (!RESERVED.has(k) && typeof v === 'number') row[k] = v;
+    c.typeChart[id] = row;
+    c.gyms.push({ id, name: t.name || id, color: t.color || '#888888', type: id, leaders: (t.trainers && t.trainers.length) ? t.trainers : DEFAULT_LEADERS,
+      leaderImages: (t.trainersImages || []).flat(), badges: (t.badges && t.badges.length) ? t.badges : [{ name: (t.name || id) + ' Badge', icon: null }], tiles: t.tiles || [] });
+  }
+  const rareIds = new Set((d.rarefamilies || []).flatMap(f => f.members.map(m => m.id)));
+  for (const [id, m] of Object.entries(d.monsters)) {
+    const f = gmsForm(m);
+    const base = (f.baseImages && f.baseImages[0]) || null, ico = (f.baseImages && f.baseImages[1]) || base;
+    const levelEvo = (m.evolutions || []).map(e => ({ id: e.id, lvl: (e.conditions && !Array.isArray(e.conditions) && typeof e.conditions.level === 'number' && Object.keys(e.conditions).length === 1) ? e.conditions.level : null }));
+    const firstLevel = levelEvo.find(e => e.lvl != null);
+    c.speciesById.set(id, { id, name: f.name, types: f.types || [], stage: null, power: typeof f.power === 'number' ? f.power : 0, sprite: base ? base + suffix : null, icon: ico ? ico + suffix : null,
+      legendary: rareIds.has(id), evolvesTo: levelEvo.map(e => e.id), evolveLevel: firstLevel ? firstLevel.lvl : null, stats: null, learnset: null, familyIndex: null, growth: m.growth || 'mediumfast', dexEntry: m.dexEntry || (m.dexEntries && m.dexEntries[0]) || null });
+  }
+  (d.families || []).forEach((f, i) => {
+    const members = f.members.map(m => ({ id: m.id, min: m.range ? m.range[0] : 1, max: m.range ? m.range[1] : 100 }));
+    const first = c.speciesById.get(members[0].id);
+    const types = new Set(); members.forEach(m => (c.speciesById.get(m.id) || { types: [] }).types.forEach(t => types.add(t)));
+    if (f.basicTypes && f.basicTypes.length) { types.clear(); f.basicTypes.forEach(t => types.add(t)); members.forEach(m => (c.speciesById.get(m.id) || { types: [] }).types.forEach(t => types.add(t))); }
+    const primary = first && first.types[0]; const tcol = primary && d.types[primary] ? d.types[primary].color : '#888888';
+    c.habitats.push({ id: 'fam' + i, name: f.name || (first ? first.name + ' Family' : 'Family ' + i), color: tcol || '#888888', types, members, diffusion: typeof f.diffusion === 'number' ? f.diffusion : 1, gen: f.gen || null });
+    members.forEach(m => { const sp = c.speciesById.get(m.id); if (sp) sp.familyIndex = i; });
+  });
+  (d.rarefamilies || []).forEach((f, i) => { const first = c.speciesById.get(f.members[0].id); c.rares.push({ id: 'rare' + i, name: f.name || f.fullName || (first ? first.name : 'Rare ' + i), members: f.members.map(m => ({ id: m.id, minlvl: m.minlvl || 50 })) }); });
+  if (p.images) for (const [name, b64] of Object.entries(p.images)) c.images.set(name, 'data:image/' + (name.toLowerCase().endsWith('.gif') ? 'gif' : 'png') + ';base64,' + b64);
+  c.catchItemImage = d.catchItemImage ? d.catchItemImage[0] : null;
+  return finishCompile(c);
+}
+let PACK = null;
+function setPack(p) {
+  if (isGmsPack(p)) { const v = validateGmsPack(p); if (!v.ok) throw new Error('invalid GMS pack: ' + v.errors.join('; ')); PACK = compileGms(p); return PACK; }
+  const v = validatePack(p); if (!v.ok) throw new Error('invalid pack: ' + v.errors.join('; '));
+  PACK = compileScouter(p); return PACK;
+}
+// Parse a GMS .bin: JSON followed by a numeric signature (only the original app verifies it).
+function parseGmsBin(text) {
+  const end = text.lastIndexOf('}');
+  if (end < 0) throw new Error('no JSON found');
+  return JSON.parse(text.slice(0, end + 1));
+}
+setPack(DEMO_PACK);
+
+// ===== Region → gyms (8 distinct gym types, one per outer macro-area; centre is the league) =====
+function regionGymList(gx, gy) {
+  const r = rng(hash32(gx, gy, 202));
+  const idx = PACK.gyms.map((_, i) => i);
+  for (let i = idx.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [idx[i], idx[j]] = [idx[j], idx[i]]; }
+  const out = []; let k = 0;
+  for (let m = 0; m < WORLD.REGION * WORLD.REGION; m++) out.push(m === LEAGUE_INDEX ? null : idx[k++ % idx.length]);
+  return out;
+}
+function gymCell(mx, my) { const h = Math.floor(WORLD.MACRO / 2); return { rx: mx * WORLD.MACRO + h, ry: my * WORLD.MACRO + h }; }
+function gymOf(mx, my) {
+  const { gx, gy } = regionOf(mx, my);
+  const mi = macroIndex(mx, my);
+  const cell = gymCell(mx, my);
+  if (mi === LEAGUE_INDEX) return { league: true, gymIndex: null, gym: null, type: null, leader: 'Champion', leaderImage: null, badge: null, cell, mx, my, gx, gy, mi };
+  const gi = regionGymList(gx, gy)[mi], g = PACK.gyms[gi];
+  const leader = g.leaders[hash32(mx, my, 303) % g.leaders.length];
+  const leaderImage = g.leaderImages.length ? g.leaderImages[hash32(mx, my, 304) % g.leaderImages.length] : null;
+  const badge = g.badges[hash32(mx, my, 305) % g.badges.length];
+  return { league: false, gymIndex: gi, gym: g, type: g.type, leader, leaderImage, badge, cell, mx, my, gx, gy, mi };
+}
+
+// ===== Route → habitat (population pool) and rare pool =====
+function routeHabitat(rx, ry) {
+  const { mx, my } = macroOf(rx, ry);
+  const g = gymOf(mx, my);
+  const h = hash32(rx, ry, 404);
+  if (!g.league) { const t = PACK.habByType.get(g.type); if (t && t.idx.length && (h % 100) < 35) return t.idx[weightedPick(t.cum, (hash32(rx, ry, 505) % 100000) / 100000)]; }
+  return weightedPick(PACK.habCum, (hash32(rx, ry, 606) % 100000) / 100000);
+}
+function routeRare(rx, ry) { return PACK.rares.length ? hash32(rx, ry, 707) % PACK.rares.length : -1; }
+function describe(lat, lon) {
+  const { rx, ry } = routeCell(lat, lon);
+  const { mx, my } = macroOf(rx, ry);
+  const { gx, gy } = regionOf(mx, my);
+  const hi = routeHabitat(rx, ry), gym = gymOf(mx, my), ri = routeRare(rx, ry);
+  return { rx, ry, mx, my, gx, gy, region: regionName(gx, gy), routeNo: routeNumber(rx, ry), macroIndex: macroIndex(mx, my),
+    habitat: hi, habitatName: PACK.habitats[hi].name, habitatColor: PACK.habitats[hi].color, rare: ri, gym, atGym: rx === gym.cell.rx && ry === gym.cell.ry };
+}
+// Pick a member of a habitat for a target level (member whose range contains it; nearest range otherwise).
+function habitatMember(hab, level, rand) {
+  const fits = hab.members.filter(m => level >= m.min && level <= m.max);
+  if (fits.length) return fits[Math.floor(rand() * fits.length)];
+  let best = hab.members[0], bd = Infinity;
+  hab.members.forEach(m => { const dist = level < m.min ? m.min - level : level - m.max; if (dist < bd) { bd = dist; best = m; } });
+  return best;
+}
+
+// ===== Encounter (stub scaling: wild level from team level and badges) =====
+function encounter(lat, lon, teamLevel, badges, seed) {
+  const d = describe(lat, lon);
+  const r = rng(hash32(d.rx, d.ry, seed | 0, 808));
+  const noise = Math.floor(r() * 6) - 2;
+  let level = Math.max(2, Math.min(100, Math.round(teamLevel * 0.8 + badges * 2 + noise)));
+  const legRoll = Math.floor(r() * WORLD.LEGENDARY_ODDS);
+  if (badges >= WORLD.LEGENDARY_MIN_BADGES && d.rare >= 0 && legRoll === 0) {
+    const pool = PACK.rares[d.rare].members.filter(m => level >= m.minlvl);
+    if (pool.length) { const m = pool[Math.floor(r() * pool.length)]; return { legendary: true, species: PACK.speciesById.get(m.id), level: Math.max(level, m.minlvl), shiny: false }; }
+  }
+  const hab = PACK.habitats[d.habitat];
+  const m = habitatMember(hab, level, r);
+  level = Math.max(m.min, Math.min(m.max, level));
+  return { legendary: false, species: PACK.speciesById.get(m.id), level, shiny: Math.floor(r() * 1024) === 0 };
+}
+
+// ===== Catch model =====
+const SNARES = [
+  { id: 'snare1', name: 'Snare I',   ceiling: 0 },
+  { id: 'snare2', name: 'Snare II',  ceiling: 10 },
+  { id: 'snare3', name: 'Snare III', ceiling: 20 },
+];
+function catchChance(wildLevel, teamLevel, tier, legendary, hpFrac = 1) {
+  const gap = wildLevel - teamLevel;
+  const base = legendary ? 0.06 : 0.5;
+  const weak = 1 + 1.5 * (1 - Math.max(0, Math.min(1, hpFrac)));
+  const p = base * (1 + 0.15 * tier) * weak / (1 + Math.exp((gap - SNARES[tier].ceiling) / 3));
+  return Math.max(0.02, Math.min(0.95, p));
+}
+function fleeChance(wildLevel, teamLevel, legendary) { const gap = wildLevel - teamLevel; return Math.max(0.05, Math.min(0.6, (legendary ? 0.3 : 0.15) + 0.02 * gap)); }
+function throwSnare(wild, teamLevel, tier, rand) {
+  const hpFrac = (wild.maxHp > 0) ? wild.hp / wild.maxHp : 1;
+  if (rand() < catchChance(wild.level, teamLevel, tier, wild.legendary, hpFrac)) return 'caught';
+  if (rand() < fleeChance(wild.level, teamLevel, wild.legendary)) return 'fled';
+  return 'stay';
+}
+
+// ===== Trainer save =====
+const SAVE_VERSION = 3;
+const TEAM_MAX = 6;
+const STARTING_BAG = [20, 8, 3];
+const SNARE_REFILL_M = 300;
+function newSave() { return { v: SAVE_VERSION, team: [], box: [], bag: STARTING_BAG.slice(), badges: {}, nextUid: 1, walkedM: 0, refillM: 0, starterChosen: false, seen: {}, gpsAuto: false }; }
+function migrateSave(raw) {
+  if (!raw || typeof raw !== 'object' || !Array.isArray(raw.team) || !Array.isArray(raw.box) || !Array.isArray(raw.bag)) return null;
+  if (raw.v === 1) { [...raw.team, ...raw.box].forEach(m => { m.xp = 0; m.hp = null; m.moves = null; }); raw.v = 2; }
+  if (raw.v === 2) { raw.badges = {}; raw.gpsAuto = false; raw.v = 3; }   // v2 stored a bare count; region badges start empty
+  if (raw.v !== SAVE_VERSION) return null;
+  if (!raw.badges || typeof raw.badges !== 'object') raw.badges = {};
+  return raw;
+}
+// badges: { "gx,gy": { gyms: { "<mi>": { wins: n, badge: {name, icon}, gymType } }, champion: n } }
+function badgeCount(save) { let n = 0; for (const r of Object.values(save.badges)) n += Object.keys(r.gyms || {}).length; return n; }
+function regionBadgeCount(save, gx, gy) { const r = save.badges[regionKey(gx, gy)]; return r ? Object.keys(r.gyms || {}).length : 0; }
+function hasBadge(save, g) { const r = save.badges[regionKey(g.gx, g.gy)]; return !!(r && r.gyms && r.gyms[g.mi]); }
+function recordGymWin(save, g) { // returns true if a new badge was earned
+  const k = regionKey(g.gx, g.gy); const r = save.badges[k] || (save.badges[k] = { gyms: {}, champion: 0, region: regionName(g.gx, g.gy) });
+  const e = r.gyms[g.mi];
+  if (e) { e.wins++; return false; }
+  r.gyms[g.mi] = { wins: 1, badge: g.badge, gymType: g.type, leader: g.leader }; return true;
+}
+function recordChampion(save, g) { const k = regionKey(g.gx, g.gy); const r = save.badges[k] || (save.badges[k] = { gyms: {}, champion: 0, region: regionName(g.gx, g.gy) }); r.champion = (r.champion || 0) + 1; return r.champion === 1; }
+function teamLevel(save) { if (!save.team.length) return 5; return Math.round(save.team.reduce((a, m) => a + m.level, 0) / save.team.length); }
+function makeMonster(save, enc, where) {
+  const m = { uid: save.nextUid++, speciesId: enc.species.id, level: enc.level, shiny: !!enc.shiny, legendary: !!enc.legendary, caughtAt: where || null, xp: 0, hp: null, moves: null };
+  hydrate(m); m.hp = m.maxHp; return m;
+}
+function addMonster(save, mon) { if (save.team.length < TEAM_MAX) { save.team.push(mon); return 'team'; } save.box.push(mon); return 'box'; }
+function moveToBox(save, uid) { const i = save.team.findIndex(m => m.uid === uid); if (i < 0) return false; save.box.push(save.team.splice(i, 1)[0]); return true; }
+function moveToTeam(save, uid) { if (save.team.length >= TEAM_MAX) return false; const i = save.box.findIndex(m => m.uid === uid); if (i < 0) return false; save.team.push(save.box.splice(i, 1)[0]); return true; }
+function addWalk(save, meters) { save.walkedM += meters; save.refillM += meters; let granted = 0; while (save.refillM >= SNARE_REFILL_M) { save.refillM -= SNARE_REFILL_M; save.bag[0]++; granted++; } return granted; }
+function starterOffer(seed) { // three low-level, low-power starters, stable per seed
+  const cands = []; PACK.habitats.forEach(h => h.members.forEach(m => { const sp = PACK.speciesById.get(m.id); if (sp && !sp.legendary && m.min <= 5 && sp.power <= 0) cands.push(sp); }));
+  const pool = cands.length >= 3 ? cands : [...PACK.speciesById.values()].filter(s => !s.legendary);
+  const r = rng(hash32(seed | 0, 707)); const idx = pool.map((_, i) => i);
+  for (let i = idx.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [idx[i], idx[j]] = [idx[j], idx[i]]; }
+  return idx.slice(0, Math.min(3, pool.length)).map(i => pool[i]);
+}
+
+// ===== Stats & progression =====
+function powerMult(sp) { const p = typeof sp.power === 'number' ? sp.power : 0; return 1 + 0.15 * (p + 1); }   // -1 → 1.0 … 4 → 1.75
+function statsFor(sp, level) {
+  if (PACK.mode === 'full' && sp.stats) {
+    const b = sp.stats;
+    return { hp: Math.floor(b.hp * 2 * level / 100) + level + 10, atk: Math.floor(b.atk * 2 * level / 100) + 5, def: Math.floor(b.def * 2 * level / 100) + 5,
+             spa: Math.floor(b.spa * 2 * level / 100) + 5, spd: Math.floor(b.spd * 2 * level / 100) + 5, spe: Math.floor(b.spe * 2 * level / 100) + 5 };
+  }
+  const pm = powerMult(sp);
+  const core = Math.round((6 + level * 1.2) * pm);
+  return { hp: Math.round((18 + level * 3.2) * pm), atk: core, def: core, spa: core, spd: core, spe: core };
+}
+function movesAtLevel(sp, level) {
+  const learned = (sp.learnset || []).filter(l => l.level <= level).sort((a, b) => a.level - b.level);
+  const uniq = []; learned.forEach(l => { if (!uniq.includes(l.move)) uniq.push(l.move); });
+  return uniq.slice(-4).map(id => ({ id, pp: PACK.movesById.get(id).pp }));
+}
+function hydrate(m) {
+  const sp = PACK.speciesById.get(m.speciesId); if (!sp) return m;
+  const st = statsFor(sp, m.level);
+  m.maxHp = st.hp;
+  if (m.hp == null || m.hp > m.maxHp) m.hp = m.maxHp;
+  if (PACK.mode === 'full') {
+    if (!m.moves) m.moves = movesAtLevel(sp, m.level); else m.moves = m.moves.filter(mv => PACK.movesById.has(mv.id));
+    if (!m.moves.length) m.moves = movesAtLevel(sp, m.level);
+  } else m.moves = null;
+  return m;
+}
+function xpToNext(level) { return 4 * level * level + 20; }
+function xpForWin(wildLevel, power) { return Math.round(wildLevel * 6 * (1 + 0.25 * ((power || 0) + 1))); }
+function grantXp(m, xp) {
+  const events = []; m.xp += xp;
+  let sp = PACK.speciesById.get(m.speciesId);
+  while (m.level < 100 && m.xp >= xpToNext(m.level)) {
+    m.xp -= xpToNext(m.level); m.level++; events.push({ type: 'level', level: m.level });
+    if (PACK.mode === 'full') (sp.learnset || []).filter(l => l.level === m.level).forEach(l => {
+      if (m.moves.some(mv => mv.id === l.move)) return;
+      if (m.moves.length < 4) m.moves.push({ id: l.move, pp: PACK.movesById.get(l.move).pp }); else { m.moves.shift(); m.moves.push({ id: l.move, pp: PACK.movesById.get(l.move).pp }); }
+      events.push({ type: 'move', move: l.move });
+    });
+    if (sp.evolveLevel && m.level >= sp.evolveLevel && sp.evolvesTo && sp.evolvesTo.length) {
+      const next = PACK.speciesById.get(sp.evolvesTo[0]); // ASSUMPTION: branching evolutions take the first listed
+      if (next) { events.push({ type: 'evolve', from: sp.id, to: next.id }); m.speciesId = next.id; sp = next; }
+    }
+  }
+  const oldMax = m.maxHp; hydrate(m); if (m.maxHp > oldMax) m.hp += m.maxHp - oldMax;
+  return events;
+}
+
+// ===== Battle engine (pure; rand is injected) =====
+function effectiveness(moveType, defTypes) { return (defTypes || []).reduce((acc, t) => acc * ((PACK.typeChart[moveType] || {})[t] ?? 1), 1); }
+function bestTypeEff(attTypes, defTypes) { let best = 1, any = false; (attTypes || []).forEach(t => { if (PACK.typeChart[t]) { const e = effectiveness(t, defTypes); if (!any || e > best) best = e; any = true; } }); return any ? best : 1; }
+function makeCombatant(m) {
+  const sp = PACK.speciesById.get(m.speciesId);
+  return { ref: m, sp, level: m.level, stats: statsFor(sp, m.level), hp: m.hp, maxHp: m.maxHp, types: sp.types || [], moves: m.moves || [], label: m.label || null };
+}
+function damageFull(att, def, move, rand) {
+  if (move.category === 'status' || !(move.power > 0)) return { dmg: 0, eff: 1, hit: true };
+  if (move.accuracy != null && rand() * 100 >= move.accuracy) return { dmg: 0, eff: 1, hit: false };
+  const A = move.category === 'physical' ? att.stats.atk : att.stats.spa, D = move.category === 'physical' ? def.stats.def : def.stats.spd;
+  const eff = effectiveness(move.type, def.types), stab = att.types.includes(move.type) ? 1.5 : 1;
+  const base = Math.floor(Math.floor(Math.floor(2 * att.level / 5 + 2) * move.power * A / D) / 50) + 2;
+  const dmg = eff === 0 ? 0 : Math.max(1, Math.floor(base * stab * eff * (0.85 + rand() * 0.15)));
+  return { dmg, eff, hit: true };
+}
+// Light mode strike: level-scaled, ~5 exchanges at equal level, with the pack's type chart applied (best of the attacker's types).
+function damageLight(att, def, guard, rand) {
+  const raw = Math.floor((2 * att.level / 5 + 2) * 90 * att.stats.atk / def.stats.def / 50) + 2;
+  const eff = bestTypeEff(att.types, def.types);
+  return { dmg: eff === 0 ? 0 : Math.max(1, Math.floor(raw * eff * (guard ? LIGHT.GUARD_CUT : 1) * (0.7 + rand() * 0.3))), eff };
+}
+function expectedDamage(att, def, move) {
+  if (move.category === 'status' || !(move.power > 0)) return 0;
+  const A = move.category === 'physical' ? att.stats.atk : att.stats.spa, D = move.category === 'physical' ? def.stats.def : def.stats.spd;
+  const eff = effectiveness(move.type, def.types), stab = att.types.includes(move.type) ? 1.5 : 1;
+  const base = Math.floor(Math.floor(Math.floor(2 * att.level / 5 + 2) * move.power * A / D) / 50) + 2;
+  return base * stab * eff * 0.925 * ((move.accuracy ?? 100) / 100);
+}
+function aiPickMove(att, def) { let best = null, bestV = -1; att.moves.forEach((mv, i) => { if (mv.pp <= 0) return; const v = expectedDamage(att, def, PACK.movesById.get(mv.id)); if (v > bestV) { bestV = v; best = i; } }); return best; }
+function battleRoundFull(pl, en, playerMoveIdx, rand) {
+  const log = [];
+  const pm = pl.moves[playerMoveIdx], em = en.moves[aiPickMove(en, pl)] || null;
+  const pMove = pm ? PACK.movesById.get(pm.id) : null, eMove = em ? PACK.movesById.get(em.id) : null;
+  const playerFirst = pl.stats.spe > en.stats.spe || (pl.stats.spe === en.stats.spe && rand() < 0.5);
+  const order = playerFirst ? [[pl, en, pMove, pm, 'you'], [en, pl, eMove, em, 'foe']] : [[en, pl, eMove, em, 'foe'], [pl, en, pMove, pm, 'you']];
+  for (const [a, d, mv, slot, who] of order) {
+    if (a.hp <= 0) continue;
+    const name = who === 'you' ? a.sp.name : (a.label || 'Wild ') + a.sp.name;
+    if (!mv) { log.push(name + ' has no moves left and struggles.'); d.hp = Math.max(0, d.hp - Math.max(1, Math.floor(d.maxHp * 0.1))); a.hp = Math.max(0, a.hp - Math.max(1, Math.floor(a.maxHp * 0.05))); }
+    else {
+      slot.pp--;
+      const r = damageFull(a, d, mv, rand);
+      if (!r.hit) log.push(name + ' used ' + mv.name + ' — missed.');
+      else if (r.dmg === 0) log.push(name + ' used ' + mv.name + ' — no effect.');
+      else { d.hp = Math.max(0, d.hp - r.dmg); log.push(name + ' used ' + mv.name + ' — ' + r.dmg + (r.eff > 1 ? ' (super effective)' : r.eff < 1 ? ' (not very effective)' : '')); }
+    }
+    if (d.hp <= 0) { log.push((d === pl ? d.sp.name : (d.label || 'Wild ') + d.sp.name) + ' fainted.'); break; }
+  }
+  pl.ref.hp = pl.hp; en.ref && (en.ref.hp = en.hp);
+  return { log, playerDown: pl.hp <= 0, enemyDown: en.hp <= 0 };
+}
+// Light mode: the foe sometimes WINDS UP instead of attacking (visible: en.windup) and hits 2.5× next round.
+// Guard cuts incoming damage to 25%; guarding a wind-up arms a 2× counter. Guarding a normal round loses tempo.
+// Verified 2026-09-03 (v4 harness): read-the-windup 93%, mash 37%, alternate 37%, always-guard 0%; reads win ~⅓ at −3 levels, ~⅒ at −5.
+const LIGHT = { WINDUP_CHANCE: 0.4, WINDUP_MULT: 2.5, GUARD_CUT: 0.25, COUNTER_MULT: 2, HIT: 0.92, CRIT: 0.10, CRIT_MULT: 1.5 };
+function battleRoundLight(pl, en, action, rand) {
+  const log = [], foe = (en.label || 'Wild ') + en.sp.name;
+  const windup = !!en.windup;
+  const playerFirst = action === 'guard' || pl.stats.spe > en.stats.spe || (pl.stats.spe === en.stats.spe && rand() < 0.5);
+  const effTag = e => e > 1 ? ' (super effective)' : e < 1 ? (e === 0 ? ' (no effect)' : ' (not very effective)') : '';
+  const playerAct = () => {
+    if (action === 'guard') { if (windup) { pl.counter = true; log.push(pl.sp.name + ' guards and braces to counter!'); } else log.push(pl.sp.name + ' guards.'); return; }
+    const counter = !!pl.counter; pl.counter = false;
+    if (rand() >= LIGHT.HIT) { log.push(pl.sp.name + ' strikes — missed.'); return; }
+    const crit = rand() < LIGHT.CRIT; const r = damageLight(pl, en, false, rand); const d = Math.floor(r.dmg * (crit ? LIGHT.CRIT_MULT : 1) * (counter ? LIGHT.COUNTER_MULT : 1));
+    en.hp = Math.max(0, en.hp - d); log.push(pl.sp.name + (counter ? ' counters for ' : ' strikes for ') + d + (crit ? ' (critical)' : '') + effTag(r.eff) + '.');
+  };
+  const enemyAct = () => {
+    if (windup) { const r = damageLight(en, pl, action === 'guard', rand); const d = Math.floor(r.dmg * LIGHT.WINDUP_MULT); pl.hp = Math.max(0, pl.hp - d); log.push(foe + ' unleashes for ' + d + effTag(r.eff) + (action === 'guard' ? ' (guarded)' : '') + '.'); en.windup = false; return; }
+    if (rand() < LIGHT.WINDUP_CHANCE) { en.windup = true; log.push(foe + ' is winding up!'); return; }
+    if (rand() >= LIGHT.HIT) { log.push(foe + ' attacks — missed.'); return; }
+    const crit = rand() < LIGHT.CRIT; const r = damageLight(en, pl, action === 'guard', rand); const d = Math.floor(r.dmg * (crit ? LIGHT.CRIT_MULT : 1));
+    pl.hp = Math.max(0, pl.hp - d); log.push(foe + ' hits for ' + d + (crit ? ' (critical)' : '') + effTag(r.eff) + (action === 'guard' ? ' (guarded)' : '') + '.');
+  };
+  if (playerFirst) { playerAct(); if (en.hp > 0) enemyAct(); } else { enemyAct(); if (pl.hp > 0) playerAct(); }
+  if (en.hp <= 0) en.windup = false;
+  if (en.hp <= 0) log.push(foe + ' is down.'); else if (pl.hp <= 0) log.push(pl.sp.name + ' is down.');
+  pl.ref.hp = pl.hp; en.ref && (en.ref.hp = en.hp);
+  return { log, playerDown: pl.hp <= 0, enemyDown: en.hp <= 0, windup: !!en.windup };
+}
+function wildInstance(enc) { const m = { uid: 0, speciesId: enc.species.id, level: enc.level, shiny: !!enc.shiny, legendary: !!enc.legendary, xp: 0, hp: null, moves: null }; hydrate(m); return m; }
+function healAll(save) { [...save.team, ...save.box].forEach(m => { hydrate(m); m.hp = m.maxHp; if (m.moves) m.moves.forEach(mv => { mv.pp = PACK.movesById.get(mv.id).pp; }); }); }
+function firstAble(save) { return save.team.findIndex(m => m.hp > 0 && PACK.speciesById.has(m.speciesId)); }
+
+// ===== Gym leaders: badge-scaled teams with a designated ace that grows with the leader =====
+function leaderLevel(totalBadges) { return Math.min(97, GYM.BASE_LEVEL + GYM.PER_BADGE * totalBadges); }
+function leaderTeamSize(totalBadges) { return Math.min(TEAM_MAX, GYM.TEAM_MIN + Math.floor(totalBadges / GYM.BADGES_PER_SLOT)); }
+function habitatPeakPower(h) { return Math.max(...h.members.map(m => (PACK.speciesById.get(m.id) || { power: 0 }).power)); }
+// The ace LINE is fixed per gym (deterministic); the ace's species is whichever member of that line fits the ace's level,
+// so it evolves as the leader's level rises with your badge count.
+function aceLine(g) {
+  const t = PACK.habByType.get(g.type); if (!t || !t.idx.length) return null;
+  const ranked = t.idx.map(i => PACK.habitats[i]).filter(h => h.members.length).sort((a, b) => habitatPeakPower(b) - habitatPeakPower(a));
+  const top = ranked.slice(0, Math.min(3, ranked.length));            // one of the three strongest lines of the gym's type
+  return top[hash32(g.mx, g.my, 909) % top.length];
+}
+function leaderTeam(g, totalBadges) { // returns [{ speciesId, level, ace }]
+  const lvl = leaderLevel(totalBadges), size = leaderTeamSize(totalBadges), r = rng(hash32(g.mx, g.my, totalBadges, 910));
+  const line = aceLine(g), team = [];
+  const t = PACK.habByType.get(g.type);
+  for (let s = 0; s < size - 1; s++) {
+    const l = Math.max(2, lvl - 2 + Math.floor(r() * 3));
+    const hab = (t && t.idx.length) ? PACK.habitats[t.idx[Math.floor(r() * t.idx.length)]] : PACK.habitats[Math.floor(r() * PACK.habitats.length)];
+    const m = habitatMember(hab, l, r); team.push({ speciesId: m.id, level: l, ace: false });
+  }
+  const aceLvl = Math.min(100, lvl + GYM.ACE_BONUS);
+  if (line) { const m = habitatMember(line, aceLvl, r); team.push({ speciesId: m.id, level: aceLvl, ace: true }); }
+  else if (team.length) team[team.length - 1].ace = true;
+  return team;
+}
+function championTeam(g, totalBadges) {
+  const lvl = Math.min(100, GYM.LEAGUE_BASE + GYM.LEAGUE_PER_BADGE * totalBadges), r = rng(hash32(g.gx, g.gy, totalBadges, 911));
+  const strong = [...PACK.habitats].filter(h => h.members.length).sort((a, b) => habitatPeakPower(b) - habitatPeakPower(a)).slice(0, 12);
+  const team = [];
+  for (let s = 0; s < TEAM_MAX; s++) { const hab = strong[Math.floor(r() * strong.length)]; const m = habitatMember(hab, lvl, r); team.push({ speciesId: m.id, level: lvl, ace: s === TEAM_MAX - 1 }); }
+  return team;
+}
+function trainerInstance(entry, label) { const m = { uid: 0, speciesId: entry.speciesId, level: entry.level, shiny: false, legendary: false, xp: 0, hp: null, moves: null, ace: !!entry.ace, label }; hydrate(m); return m; }
+/* CORE-END */
+
+// ===================== UI (not under test) =====================
+const state = {
+  lat: 43.4516, lon: -80.4925,
+  zoomOut: false, gps: { on: false, watchId: null, acc: null, at: 0, err: null }, sim: false, view: 'map', squares: true, follow: true,
+  speedIdx: 0, held: {}, odometerM: 0, scanSeed: 1,
+  save: null, battle: null,
+};
+const SPEEDS = [{ label: 'walk', mps: 1.4 }, { label: 'bike', mps: 5 }, { label: 'car', mps: 25 }];
+const sprites = new Map(); // scouter-pack sprite filename → object URL
+function imgSrc(name) { if (!name) return null; return sprites.get(name) || (PACK.images && PACK.images.get(name)) || null; }
+
+const canvas = document.getElementById('map');
+const ctx = canvas.getContext('2d');
+function fitCanvas() {
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+  canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+window.addEventListener('resize', fitCanvas);
+if (window.ResizeObserver) new ResizeObserver(fitCanvas).observe(document.getElementById('arena'));
+
+// View transform: one function gives every cell's screen rect; the player dot is placed with the same function.
+function viewParams(w, h) {
+  const d = describe(state.lat, state.lon);
+  const side = WORLD.MACRO * WORLD.REGION;
+  if (state.zoomOut) { const cellW = w / side, cellH = h / side, originRx = d.gx * side, originRy = d.gy * side; return { d, side, cellW, cellH, originRx, originRy, shiftX: 0, shiftY: 0, cols: side, rows: side }; }
+  const px = Math.min(w, h) / 9, cellW = px, cellH = px;
+  const cols = Math.ceil(w / cellW) + 2, rows = Math.ceil(h / cellH) + 2;
+  const originRx = d.rx - Math.floor(cols / 2), originRy = d.ry - Math.floor(rows / 2);
+  const fx = (state.lon / WORLD.LON_STEP) - d.rx, fy = (state.lat / WORLD.LAT_STEP) - d.ry;   // fraction inside the cell (from west / from south)
+  const cxP = d.rx - originRx, cyP = d.ry - originRy;
+  // cell (cx,cy) is drawn with its top-left at (cx*cellW + shiftX, h - (cy+1)*cellH + shiftY); solve so the player's point lands at the centre
+  const shiftX = w / 2 - (cxP + fx) * cellW;
+  const shiftY = h / 2 - h + (cyP + 1) * cellH - (1 - fy) * cellH;
+  return { d, side, cellW, cellH, originRx, originRy, shiftX, shiftY, cols, rows };
+}
+function cellRect(v, rx, ry, h) { const cx = rx - v.originRx, cy = ry - v.originRy; return { x: cx * v.cellW + v.shiftX, y: h - (cy + 1) * v.cellH + v.shiftY, w: v.cellW, h: v.cellH }; }
+function playerPoint(v, w, h) {
+  if (!state.zoomOut) return { x: w / 2, y: h / 2 };
+  return { x: (state.lon / WORLD.LON_STEP - v.originRx) * v.cellW, y: h - (state.lat / WORLD.LAT_STEP - v.originRy) * v.cellH };
+}
+window.__mapDebug = () => { const w = canvas.clientWidth, h = canvas.clientHeight, v = viewParams(w, h); return { rect: cellRect(v, v.d.rx, v.d.ry, h), dot: playerPoint(v, w, h) }; };
+function draw() {
+  updateHud();
+  if (state.view !== 'grid') return;
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  ctx.clearRect(0, 0, w, h);
+  const v = viewParams(w, h), d = v.d, side = v.side, cellW = v.cellW, cellH = v.cellH, originRx = v.originRx, originRy = v.originRy, cols = v.cols, rows = v.rows;
+  for (let cy = 0; cy < rows; cy++) for (let cx = 0; cx < cols; cx++) {
+    const rx = originRx + cx, ry = originRy + cy;
+    const rc = cellRect(v, rx, ry, h), x = rc.x, y = rc.y;
+    ctx.fillStyle = PACK.habitats[routeHabitat(rx, ry)].color;
+    ctx.globalAlpha = (rx === d.rx && ry === d.ry) ? 0.95 : 0.55;
+    ctx.fillRect(x, y, cellW, cellH); ctx.globalAlpha = 1;
+    ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 1; ctx.strokeRect(x + .5, y + .5, cellW - 1, cellH - 1);
+    const isMacroW = mod(rx, WORLD.MACRO) === 0, isMacroS = mod(ry, WORLD.MACRO) === 0, isRegW = mod(rx, side) === 0, isRegS = mod(ry, side) === 0;
+    ctx.strokeStyle = '#0f1418';
+    if (isMacroW) { ctx.lineWidth = isRegW ? 5 : 2.5; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + cellH); ctx.stroke(); }
+    if (isMacroS) { ctx.lineWidth = isRegS ? 5 : 2.5; ctx.beginPath(); ctx.moveTo(x, y + cellH); ctx.lineTo(x + cellW, y + cellH); ctx.stroke(); }
+    const m = macroOf(rx, ry), g = gymOf(m.mx, m.my);
+    if (g.league) { ctx.strokeStyle = 'rgba(255,255,255,.3)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, y + cellH); ctx.lineTo(x + cellW, y); ctx.stroke(); }
+    if (g.cell.rx === rx && g.cell.ry === ry) { // gym / league marker
+      const won = state.save && (g.league ? (state.save.badges[regionKey(g.gx, g.gy)] || {}).champion : hasBadge(state.save, g));
+      ctx.fillStyle = won ? '#3f9a6a' : (g.league ? '#e8c33a' : '#ffffff');
+      ctx.beginPath(); ctx.arc(x + cellW / 2, y + cellH / 2, Math.max(5, cellW * 0.22), 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.stroke();
+    }
+  }
+  if (state.zoomOut) {
+    ctx.font = '600 11px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (let my = 0; my < WORLD.REGION; my++) for (let mx = 0; mx < WORLD.REGION; mx++) {
+      const g = gymOf(d.gx * WORLD.REGION + mx, d.gy * WORLD.REGION + my);
+      const cxp = (mx + .5) * WORLD.MACRO * cellW, cyp = h - (my + .5) * WORLD.MACRO * cellH - cellH * 0.9;
+      ctx.fillStyle = 'rgba(15,20,24,.85)'; ctx.beginPath(); ctx.arc(cxp, cyp, 22, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.fillText(g.league ? 'LEAGUE' : g.gym.name, cxp, cyp);
+    }
+  }
+  const pp = playerPoint(v, w, h), px = pp.x, py = pp.y;
+  ctx.fillStyle = '#4ea3ff'; ctx.beginPath(); ctx.arc(px, py, 7, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+  if (state.gps.on && state.gps.acc) { const rpx = state.gps.acc / (WORLD.LAT_STEP * 111320) * cellH; ctx.strokeStyle = 'rgba(78,163,255,.5)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(px, py, Math.min(rpx, w), 0, Math.PI * 2); ctx.stroke(); }
+
+}
+
+function updateHud() {
+  const d = describe(state.lat, state.lon);
+  const g = d.gym;
+  document.getElementById('hRegion').textContent = d.region + (state.zoomOut && state.view === 'grid' ? ' — region view' : '');
+  document.getElementById('hRoute').innerHTML = 'Route <b>' + d.routeNo + '</b> · habitat <b>' + d.habitatName + '</b>';
+  const c = cellCenter(g.cell.rx, g.cell.ry), dist = haversineM(state.lat, state.lon, c.lat, c.lon), br = compass(bearingDeg(state.lat, state.lon, c.lat, c.lon));
+  const tb = state.save ? badgeCount(state.save) : 0;
+  let gymTxt;
+  if (g.league) gymTxt = 'League · ' + (d.atGym ? 'you are here' : Math.round(dist) + ' m ' + br) + ' · ' + regionBadgeCount(state.save, g.gx, g.gy) + '/' + GYM.REGION_BADGES_FOR_LEAGUE + ' badges here';
+  else gymTxt = g.gym.name + ' gym · ' + g.leader + ' Lv ' + leaderLevel(tb) + (hasBadge(state.save, g) ? ' ✓' : '') + ' · ' + (d.atGym ? 'you are here' : Math.round(dist) + ' m ' + br);
+  document.getElementById('hGym').textContent = gymTxt;
+  const gpsTxt = state.gps.on ? ('GPS ±' + (state.gps.acc ? Math.round(state.gps.acc) : '?') + ' m, ' + (state.gps.at ? Math.round((Date.now() - state.gps.at) / 1000) + ' s ago' : 'waiting…')) : (state.sim ? 'sim ' + SPEEDS[state.speedIdx].label : 'no fix');
+  document.getElementById('hPos').textContent = state.lat.toFixed(5) + ', ' + state.lon.toFixed(5) + ' · ' + (state.odometerM / 1000).toFixed(2) + ' km · team Lv ' + (state.save ? teamLevel(state.save) : '–') + ' · ' + tb + ' badges · ' + gpsTxt;
+  // gym button
+  const gb = document.getElementById('gymBtn');
+  if (d.atGym && !state.battle) {
+    gb.classList.add('show');
+    if (g.league) { const ok = regionBadgeCount(state.save, g.gx, g.gy) >= GYM.REGION_BADGES_FOR_LEAGUE; gb.textContent = ok ? '⚑ Challenge the ' + d.region + ' League' : '⚑ League locked — ' + regionBadgeCount(state.save, g.gx, g.gy) + '/' + GYM.REGION_BADGES_FOR_LEAGUE + ' badges in ' + d.region; gb.classList.toggle('locked', !ok); gb.disabled = !ok; }
+    else { gb.textContent = '⚑ ' + (hasBadge(state.save, g) ? 'Rematch ' : 'Challenge ') + g.leader + ' — ' + g.gym.name + ' gym'; gb.classList.remove('locked'); gb.disabled = false; }
+  } else gb.classList.remove('show');
+}
+
+// ----- movement -----
+let last = performance.now(), acc = 0; const STEP = 1 / 30;
+function tick(now) { let dt = Math.min(0.25, (now - last) / 1000); last = now; acc += dt; while (acc >= STEP) { simStep(STEP); acc -= STEP; } draw(); requestAnimationFrame(tick); }
+function simStep(dt) {
+  if (state.gps.on || !state.sim) return;
+  const mps = SPEEDS[state.speedIdx].mps; let dn = 0, de = 0;
+  if (state.held.n) dn += 1; if (state.held.s) dn -= 1; if (state.held.e) de += 1; if (state.held.w) de -= 1;
+  if (!dn && !de) return;
+  const len = Math.hypot(dn, de); dn /= len; de /= len;
+  moveTo(state.lat + (dn * mps * dt) / 111320, state.lon + (de * mps * dt) / (111320 * Math.cos(state.lat * Math.PI / 180)));
+}
+function moveTo(lat, lon, countWalk = true) {
+  const d = haversineM(state.lat, state.lon, lat, lon);
+  if (countWalk) { state.odometerM += d; if (state.save && addWalk(state.save, d)) persistSave(); }
+  state.lat = lat; state.lon = lon;
+  osmRefresh(false);
+}
+document.querySelectorAll('[data-d]').forEach(b => { const d = b.dataset.d; const on = e => { e.preventDefault(); state.held[d] = true; }, off = e => { e.preventDefault(); state.held[d] = false; }; b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off); b.addEventListener('pointercancel', off); b.addEventListener('pointerleave', off); });
+const keyMap = { ArrowUp: 'n', ArrowDown: 's', ArrowLeft: 'w', ArrowRight: 'e', w: 'n', s: 's', a: 'w', d: 'e' };
+window.addEventListener('keydown', e => { if (keyMap[e.key]) state.held[keyMap[e.key]] = true; });
+window.addEventListener('keyup', e => { if (keyMap[e.key]) state.held[keyMap[e.key]] = false; });
+document.getElementById('speed').addEventListener('click', () => { state.speedIdx = (state.speedIdx + 1) % SPEEDS.length; document.getElementById('speed').textContent = SPEEDS[state.speedIdx].label; });
+document.getElementById('zoom').addEventListener('click', e => { if (state.view === 'grid') { state.zoomOut = !state.zoomOut; e.target.textContent = state.zoomOut ? 'Route view' : 'Region view'; } else if (osm.map) { const z = osm.map.getZoom(); osm.map.setZoom(z >= 15 ? 13 : 16); e.target.textContent = z >= 15 ? 'Route view' : 'Region view'; } });
+
+// ----- live GPS -----
+// Filters: fixes worse than 60 m are ignored; a jump implying > 60 m/s (216 km/h) is dropped as a glitch.
+// Position always follows plausible fixes (car, bus, train); walking credit (odometer, snare refill) only accrues below 7 m/s.
+let lastFix = null;
+function gpsStart(fromGesture) {
+  if (!navigator.geolocation) { flash('Geolocation API unavailable in this context.'); return; }
+  state.gps.on = true; state.gps.err = null; state.gps.at = 0; updateGpsBtn();
+  state.gps.watchId = navigator.geolocation.watchPosition(p => {
+    const { latitude: lat, longitude: lon, accuracy } = p.coords, t = p.timestamp || Date.now();
+    state.gps.acc = accuracy; state.gps.at = t;
+    if (accuracy > 60) return;
+    let speed = 0;
+    if (lastFix) { const dist = haversineM(lastFix.lat, lastFix.lon, lat, lon), dtS = Math.max(0.5, (t - lastFix.t) / 1000); speed = dist / dtS; if (speed > 60) return; }
+    const first = !lastFix; lastFix = { lat, lon, t };
+    if (first) { state.lat = lat; state.lon = lon; if (osm.map) osm.map.setView([lat, lon], 16); } else moveTo(lat, lon, speed <= 7);
+    if (osm.map && state.follow) osm.map.panTo([lat, lon], { animate: false });
+  }, err => {
+    if (err.code === 3) { state.gps.err = 'waiting for a fix'; return; }          // TIMEOUT: keep watching
+    state.gps.err = err.message; state.gps.on = false; updateGpsBtn();
+    flash('GPS unavailable: ' + err.message + (err.code === 1 ? '. Allow location for this site (sandboxed previews block it — open the page from GitHub Pages).' : '') + ' Tap "Live GPS" to retry, or use the simulator.');
+    setSim(true);
+  }, { enableHighAccuracy: true, maximumAge: 1000 });
+  if (state.save) { state.save.gpsAuto = true; persistSave(); }
+}
+function gpsStop() { if (state.gps.watchId != null) navigator.geolocation.clearWatch(state.gps.watchId); state.gps.on = false; state.gps.watchId = null; lastFix = null; updateGpsBtn(); if (state.save) { state.save.gpsAuto = false; persistSave(); } }
+function updateGpsBtn() {
+  const b = document.getElementById('gps'); b.textContent = state.gps.on ? 'Live GPS ✓' : (state.sim ? 'Sim → GPS' : 'Live GPS');
+  b.classList.toggle('on', state.gps.on);
+  document.getElementById('gpsBig').classList.toggle('show', !state.gps.on && !state.sim && !state.battle);
+  document.getElementById('pad').classList.toggle('hidden', !state.sim || state.gps.on);
+}
+function setSim(on) { state.sim = on; if (on && state.gps.on) gpsStop(); updateGpsBtn(); }
+document.getElementById('gps').addEventListener('click', () => { if (state.gps.on) { gpsStop(); setSim(true); } else { setSim(false); gpsStart(true); } });
+document.getElementById('gpsBig').addEventListener('click', () => { setSim(false); gpsStart(true); });
+document.getElementById('centerBtn').addEventListener('click', () => { state.follow = true; if (osm.map) osm.map.panTo([state.lat, state.lon]); document.getElementById('centerBtn').classList.remove('show'); });
+
+
+// ----- real map (Leaflet + OpenStreetMap tiles) with the world's cells as an overlay -----
+const osm = { ok: false, map: null, tiles: null, cells: null, gyms: null, me: null, acc: null, lastKey: '' };
+function osmInit() {
+  if (window.__leafletFailed || typeof L === 'undefined') { osm.ok = false; return; }
+  try {
+    osm.map = L.map('osm', { zoomControl: false, attributionControl: true, minZoom: 11, maxZoom: 19 }).setView([state.lat, state.lon], 16);
+    osm.tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' }).addTo(osm.map);
+    osm.cells = L.layerGroup().addTo(osm.map); osm.gyms = L.layerGroup().addTo(osm.map);
+    osm.me = L.circleMarker([state.lat, state.lon], { radius: 8, color: '#fff', weight: 2, fillColor: '#4ea3ff', fillOpacity: 1 }).addTo(osm.map);
+    osm.acc = L.circle([state.lat, state.lon], { radius: 0, color: '#4ea3ff', weight: 1, fillOpacity: 0.08 }).addTo(osm.map);
+    osm.map.on('moveend zoomend', () => osmRefresh(false));
+    osm.map.on('dragstart', () => { state.follow = false; document.getElementById('centerBtn').classList.add('show'); });
+    osm.map.on('click', e => { if (state.sim && !state.gps.on) { moveTo(e.latlng.lat, e.latlng.lng, false); osmRefresh(true); } });
+    osm.tiles.on('tileerror', () => { if (!osm.tileErr) { osm.tileErr = true; flash('Map tiles are not loading here (network blocked?). The squares still work; switch to Grid if the map stays blank.'); } });
+    osm.ok = true;
+  } catch (e) { console.warn('leaflet init failed', e.message); osm.ok = false; }
+}
+function osmRefresh(force) {
+  if (!osm.ok || state.view !== 'map') return;
+  const b = osm.map.getBounds(), z = osm.map.getZoom();
+  osm.me.setLatLng([state.lat, state.lon]); osm.acc.setLatLng([state.lat, state.lon]).setRadius(state.gps.on && state.gps.acc ? state.gps.acc : 0);
+  const d = describe(state.lat, state.lon);
+  const key = [Math.floor(b.getSouth() / WORLD.LAT_STEP), Math.floor(b.getWest() / WORLD.LON_STEP), Math.ceil(b.getNorth() / WORLD.LAT_STEP), Math.ceil(b.getEast() / WORLD.LON_STEP), z, d.rx, d.ry, state.squares, PACK.meta.name, badgeCount(state.save || newSave())].join('|');
+  if (!force && key === osm.lastKey) return; osm.lastKey = key;
+  osm.cells.clearLayers(); osm.gyms.clearLayers();
+  const ry0 = Math.floor(b.getSouth() / WORLD.LAT_STEP), ry1 = Math.ceil(b.getNorth() / WORLD.LAT_STEP), rx0 = Math.floor(b.getWest() / WORLD.LON_STEP), rx1 = Math.ceil(b.getEast() / WORLD.LON_STEP);
+  const count = (ry1 - ry0 + 1) * (rx1 - rx0 + 1);
+  const drawCells = state.squares && count <= 900;                  // beyond ~30×30 cells, draw only domain/gym structure
+  for (let ry = ry0; ry <= ry1; ry++) for (let rx = rx0; rx <= rx1; rx++) {
+    const cb = cellBounds(rx, ry), here = rx === d.rx && ry === d.ry;
+    if (drawCells) osm.cells.addLayer(L.rectangle([[cb.lat0, cb.lon0], [cb.lat1, cb.lon1]], { color: '#0f1418', weight: here ? 3 : 0.5, opacity: 0.6, fillColor: PACK.habitats[routeHabitat(rx, ry)].color, fillOpacity: here ? 0.55 : 0.28, interactive: false }));
+    const m = macroOf(rx, ry), g = gymOf(m.mx, m.my);
+    if (mod(rx, WORLD.MACRO) === 0 && mod(ry, WORLD.MACRO) === 0 && (!drawCells || z >= 13)) {       // domain outline + label once per macro-area
+      const mb0 = cellBounds(m.mx * WORLD.MACRO, m.my * WORLD.MACRO), mb1 = cellBounds(m.mx * WORLD.MACRO + WORLD.MACRO - 1, m.my * WORLD.MACRO + WORLD.MACRO - 1);
+      osm.gyms.addLayer(L.rectangle([[mb0.lat0, mb0.lon0], [mb1.lat1, mb1.lon1]], { color: g.league ? '#e8c33a' : (g.gym.color || '#fff'), weight: 2, opacity: 0.7, fill: false, interactive: false }));
+    }
+    if (g.cell.rx === rx && g.cell.ry === ry) {
+      const c = cellCenter(rx, ry); const won = state.save && (g.league ? (state.save.badges[regionKey(g.gx, g.gy)] || {}).champion : hasBadge(state.save, g));
+      const mk = L.circleMarker([c.lat, c.lon], { radius: 9, color: '#000', weight: 2, fillColor: won ? '#3f9a6a' : (g.league ? '#e8c33a' : '#fff'), fillOpacity: 1 });
+      mk.bindTooltip(g.league ? 'League' : g.gym.name + ' gym · ' + g.leader, { direction: 'top', offset: [0, -8] });
+      osm.gyms.addLayer(mk);
+    }
+  }
+}
+
+// ----- view mode & squares -----
+document.getElementById('viewMode').addEventListener('click', e => setView(state.view === 'map' ? 'grid' : 'map'));
+document.getElementById('squares').addEventListener('click', e => { state.squares = !state.squares; e.target.textContent = 'Squares: ' + (state.squares ? 'on' : 'off'); osmRefresh(true); });
+function setView(v) {
+  if (v === 'map' && !osm.ok) { flash('Map tiles unavailable here (no network to the tile server). Showing the grid.'); v = 'grid'; }
+  state.view = v; document.getElementById('viewMode').textContent = v === 'map' ? 'Map' : 'Grid';
+  document.getElementById('osm').classList.toggle('hidden', v !== 'map'); document.getElementById('map').classList.toggle('hidden', v !== 'grid');
+  document.getElementById('zoom').textContent = v === 'grid' ? (state.zoomOut ? 'Route view' : 'Region view') : 'Region view';
+  if (v === 'grid') fitCanvas(); else if (osm.map) { setTimeout(() => { osm.map.invalidateSize(); osmRefresh(true); }, 50); }
+}
+
+// ----- encounters & battles (wild / gym / league) -----
+function flash(msg, ms = 4000) { const f = document.getElementById('flash'); f.textContent = msg; f.classList.add('show'); clearTimeout(f._h); f._h = setTimeout(() => f.classList.remove('show'), ms); }
+function hpBar(m) { const f = m.maxHp ? m.hp / m.maxHp : 1; return '<div class="hpb"><div class="hpf" style="width:' + Math.round(f * 100) + '%;background:' + (f > 0.5 ? '#3f9a6a' : f > 0.2 ? '#d8a63a' : '#d8503a') + '"></div></div><small>' + m.hp + '/' + m.maxHp + '</small>'; }
+function startBattle(kind, foes, meta, headline) {
+  state.battle = { kind, foes, foeIdx: 0, meta, active: firstAble(state.save), log: [], windup: false, counter: false, xpTotal: 0 };
+  document.getElementById('gpsBig').classList.remove('show');
+  renderBattle(headline);
+}
+document.getElementById('scan').addEventListener('click', () => {
+  if (state.battle) return;
+  if (firstAble(state.save) < 0) { flash('Your team is out of HP. Heal first (Team panel).'); return; }
+  const enc = encounter(state.lat, state.lon, teamLevel(state.save), badgeCount(state.save), state.scanSeed++);
+  const d = describe(state.lat, state.lon);
+  startBattle('wild', [wildInstance(enc)], { enc, where: { region: d.region, route: d.routeNo } }, (enc.legendary ? '★ ' : '') + 'A wild ' + enc.species.name + (enc.shiny ? ' ✦' : '') + ' appeared! Lv ' + enc.level);
+});
+document.getElementById('gymBtn').addEventListener('click', () => {
+  if (state.battle) return;
+  if (firstAble(state.save) < 0) { flash('Your team is out of HP. Heal first (Team panel).'); return; }
+  const d = describe(state.lat, state.lon), g = d.gym, tb = badgeCount(state.save);
+  if (g.league) {
+    if (regionBadgeCount(state.save, g.gx, g.gy) < GYM.REGION_BADGES_FOR_LEAGUE) return;
+    const foes = championTeam(g, tb).map(e => trainerInstance(e, 'Champion’s '));
+    startBattle('league', foes, { g }, 'The ' + d.region + ' Champion sends out ' + PACK.speciesById.get(foes[0].speciesId).name + '!');
+  } else {
+    const team = leaderTeam(g, tb), foes = team.map(e => trainerInstance(e, g.leader + '’s '));
+    startBattle('gym', foes, { g, team }, g.leader + ' (' + g.gym.name + ' gym, Lv ' + leaderLevel(tb) + ') sends out ' + PACK.speciesById.get(foes[0].speciesId).name + '!');
+  }
+});
+function currentFoe() { return state.battle.foes[state.battle.foeIdx]; }
+function renderBattle(headline) {
+  const b = state.battle, t = document.getElementById('toast');
+  const me = state.save.team[b.active], mySp = PACK.speciesById.get(me.speciesId), foe = currentFoe(), fSp = PACK.speciesById.get(foe.speciesId);
+  hydrate(me);
+  document.getElementById('tSp').textContent = headline;
+  const isWild = b.kind === 'wild';
+  const odds = isWild ? '<div>Catch odds: ' + SNARES.map((sn, i) => sn.name.split(' ')[1] + ' ' + Math.round(100 * catchChance(foe.level, teamLevel(state.save), i, foe.legendary, foe.hp / foe.maxHp)) + '%').join(' / ') + '</div>' : '<div>' + (b.foeIdx + 1) + ' of ' + b.foes.length + (foe.ace ? ' · ACE' : '') + '</div>';
+  document.getElementById('tMeta').innerHTML =
+    '<div class="row2"><span>' + (foe.label || 'Wild ') + fSp.name + ' Lv ' + foe.level + '</span>' + hpBar(foe) + '</div>' +
+    '<div class="row2"><span>' + mySp.name + ' Lv ' + me.level + '</span>' + hpBar(me) + '</div>' +
+    (b.log.length ? '<div class="log">' + b.log.slice(-3).join('<br>') + '</div>' : '') + odds;
+  const img = document.getElementById('tImg');
+  const src = (b.kind !== 'wild' && b.meta.g && b.meta.g.leaderImage && b.log.length === 0) ? imgSrc(b.meta.g.leaderImage) : imgSrc(fSp.sprite);
+  img.className = (b.kind !== 'wild' && b.log.length === 0 && b.meta.g && b.meta.g.leaderImage) ? 'leader' : 'foe';
+  if (src) { img.src = src; img.style.display = 'block'; } else img.style.display = 'none';
+  const acts = document.getElementById('tActs'); acts.innerHTML = '';
+  const add = (label, fn, disabled) => { const x = document.createElement('button'); x.textContent = label; x.disabled = !!disabled; x.addEventListener('click', fn); acts.appendChild(x); return x; };
+  if (PACK.mode === 'full') me.moves.forEach((mv, i) => { const m = PACK.movesById.get(mv.id); add(m.name + ' (' + mv.pp + ')', () => act({ move: i }), mv.pp <= 0); });
+  else { add(b.counter ? 'Strike (counter ×2)' : 'Strike', () => act({ light: 'strike' })); const gb = add(b.windup ? 'Guard ⚠ wind-up!' : 'Guard', () => act({ light: 'guard' })); if (b.windup) gb.classList.add('on'); }
+  if (isWild) SNARES.forEach((sn, i) => add(sn.name + ' ×' + state.save.bag[i], () => throwAt(i), state.save.bag[i] <= 0));
+  add(isWild ? 'Run' : 'Forfeit', () => endBattle(isWild ? null : 'You withdrew.'));
+  t.classList.add('show'); clearTimeout(t._h);
+}
+function act(a) {
+  const b = state.battle; if (!b) return;
+  const me = state.save.team[b.active], foe = currentFoe();
+  const pl = makeCombatant(me), en = makeCombatant(foe); en.windup = !!b.windup; pl.counter = !!b.counter;
+  const r = PACK.mode === 'full' ? battleRoundFull(pl, en, a.move, Math.random) : battleRoundLight(pl, en, a.light, Math.random);
+  b.windup = !!r.windup; b.counter = !!pl.counter; b.log.push(...r.log);
+  if (r.enemyDown) {
+    const fSp = PACK.speciesById.get(foe.speciesId);
+    const xp = xpForWin(foe.level, fSp.power); const ev = grantXp(me, xp); b.xpTotal += xp; state.save.seen[foe.speciesId] = true;
+    const evMsg = ev.map(e => e.type === 'level' ? 'Lv ' + e.level : e.type === 'move' ? 'learned ' + PACK.movesById.get(e.move).name : 'evolved into ' + PACK.speciesById.get(e.to).name + '!');
+    if (b.foeIdx + 1 < b.foes.length) { b.foeIdx++; b.windup = false; b.counter = false; persistSave(); const nf = currentFoe(); renderBattle('+' + xp + ' XP' + (evMsg.length ? ' · ' + evMsg.join(' · ') : '') + ' — next: ' + PACK.speciesById.get(nf.speciesId).name + (nf.ace ? ' (ACE)' : '')); return; }
+    if (b.kind === 'gym') { const first = recordGymWin(state.save, b.meta.g); persistSave(); endBattle('Beat ' + b.meta.g.leader + '! ' + (first ? 'Earned the ' + b.meta.g.badge.name + '.' : 'Rematch won (badge already held).') + ' +' + b.xpTotal + ' XP' + (evMsg.length ? ' · ' + evMsg.join(' · ') : '')); return; }
+    if (b.kind === 'league') { const first = recordChampion(state.save, b.meta.g); persistSave(); endBattle((first ? 'You are the Champion of ' + regionName(b.meta.g.gx, b.meta.g.gy) + '!' : 'Champion defended again.') + ' +' + b.xpTotal + ' XP'); return; }
+    persistSave(); endBattle('Won! +' + xp + ' XP' + (evMsg.length ? ' · ' + evMsg.join(' · ') : '')); return;
+  }
+  if (r.playerDown) {
+    persistSave(); const next = firstAble(state.save);
+    if (next < 0) { endBattle('Your team is out. Heal up before trying again.'); return; }
+    b.active = next; b.counter = false; renderBattle(PACK.speciesById.get(me.speciesId).name + ' fainted — ' + PACK.speciesById.get(state.save.team[next].speciesId).name + ' steps in.'); return;
+  }
+  persistSave(); renderBattle((foe.label || 'Wild ') + PACK.speciesById.get(foe.speciesId).name + ' Lv ' + foe.level);
+}
+function throwAt(tier) {
+  const b = state.battle; if (!b || b.kind !== 'wild' || state.save.bag[tier] <= 0) return;
+  const foe = currentFoe(); state.save.bag[tier]--;
+  const res = throwSnare(foe, teamLevel(state.save), tier, Math.random), name = PACK.speciesById.get(foe.speciesId).name;
+  if (res === 'caught') { const mon = makeMonster(state.save, b.meta.enc, b.meta.where); mon.hp = foe.hp; const where = addMonster(state.save, mon); state.save.seen[foe.speciesId] = true; persistSave(); endBattle('Caught ' + name + '! Sent to ' + where + '.'); }
+  else if (res === 'fled') { persistSave(); endBattle(name + ' fled.'); }
+  else {
+    const me = state.save.team[b.active]; const pl = makeCombatant(me), en = makeCombatant(foe); en.windup = !!b.windup;
+    let lines = [name + ' broke free!'];
+    if (PACK.mode === 'full') { const mi = aiPickMove(en, pl); if (mi != null) { const mv = PACK.movesById.get(en.moves[mi].id); en.moves[mi].pp--; const d = damageFull(en, pl, mv, Math.random); if (d.hit && d.dmg) pl.hp = Math.max(0, pl.hp - d.dmg); me.hp = pl.hp; lines.push('Wild ' + name + ' used ' + mv.name + (d.hit ? ' — ' + d.dmg : ' — missed.')); } }
+    else { const d = damageLight(en, pl, false, Math.random); me.hp = Math.max(0, me.hp - d.dmg); lines.push('Wild ' + name + ' hits for ' + d.dmg + '.'); }
+    b.log.push(...lines); persistSave();
+    if (me.hp <= 0) { const next = firstAble(state.save); if (next < 0) { endBattle('Your team is out. Heal up before scanning again.'); return; } b.active = next; }
+    renderBattle(name + ' broke free!');
+  }
+}
+function endBattle(msg) {
+  state.battle = null; osm.lastKey = ''; osmRefresh(true); updateGpsBtn(); const t = document.getElementById('toast');
+  if (msg) { document.getElementById('tSp').textContent = msg; document.getElementById('tMeta').textContent = ''; document.getElementById('tActs').innerHTML = ''; document.getElementById('tImg').style.display = 'none'; t._h = setTimeout(() => t.classList.remove('show'), 3200); }
+  else t.classList.remove('show');
+  renderTeam();
+}
+
+// ----- team, box, badges panel -----
+const panel = document.getElementById('panel');
+document.getElementById('team').addEventListener('click', () => { panel.classList.toggle('show'); renderTeam(); });
+document.getElementById('heal').addEventListener('click', () => { healAll(state.save); persistSave(); renderTeam(); });
+function monRow(m, inTeam) {
+  const sp = PACK.speciesById.get(m.speciesId), row = document.createElement('div'); row.className = 'mon';
+  const url = sp && imgSrc(sp.icon || sp.sprite);
+  row.innerHTML = (url ? '<img src="' + url + '">' : '<span class="ph"></span>') + '<span class="nm">' + (sp ? sp.name : '(from another pack: ' + m.speciesId + ')') + (m.shiny ? ' ✦' : '') + (m.legendary ? ' ★' : '') + ' <small>Lv ' + m.level + ' · HP ' + m.hp + '/' + m.maxHp + (m.caughtAt ? ' · ' + m.caughtAt.region + ' R' + m.caughtAt.route : '') + '</small></span>';
+  const b = document.createElement('button'); b.textContent = inTeam ? 'To box' : 'To team';
+  b.addEventListener('click', () => { (inTeam ? moveToBox : moveToTeam)(state.save, m.uid); persistSave(); renderTeam(); });
+  if (!inTeam && (state.save.team.length >= TEAM_MAX || !sp)) b.disabled = true;
+  row.appendChild(b); return row;
+}
+function renderTeam() {
+  if (!state.save) return;
+  document.getElementById('team').textContent = 'Team ' + state.save.team.length + '/' + TEAM_MAX + ' · Box ' + state.save.box.length;
+  if (!panel.classList.contains('show')) return;
+  const tl = document.getElementById('pTeam'), bl = document.getElementById('pBox'); tl.innerHTML = ''; bl.innerHTML = '';
+  state.save.team.forEach(m => { hydrate(m); tl.appendChild(monRow(m, true)); }); state.save.box.forEach(m => { hydrate(m); bl.appendChild(monRow(m, false)); });
+  const pb = document.getElementById('pBadges'); pb.innerHTML = '';
+  let any = false;
+  for (const [k, r] of Object.entries(state.save.badges)) {
+    for (const e of Object.values(r.gyms || {})) { any = true; const s = document.createElement('span'); s.className = 'badge'; const ic = e.badge && imgSrc(e.badge.icon); s.innerHTML = (ic ? '<img src="' + ic + '">' : '🏅') + ' ' + (e.badge ? e.badge.name : e.gymType) + ' <small>· ' + (r.region || k) + ' · ' + e.leader + (e.wins > 1 ? ' ×' + e.wins : '') + '</small>'; pb.appendChild(s); }
+    if (r.champion) { any = true; const s = document.createElement('span'); s.className = 'badge'; s.innerHTML = '🏆 Champion of ' + (r.region || k) + (r.champion > 1 ? ' <small>×' + r.champion + '</small>' : ''); pb.appendChild(s); }
+  }
+  if (!any) pb.textContent = 'None yet. Walk to a gym (the white dot in each domain) and challenge the leader.';
+  document.getElementById('pBag').textContent = SNARES.map((sn, i) => sn.name + ' ×' + state.save.bag[i]).join(' · ') + ' · +1 Snare I per ' + SNARE_REFILL_M + ' m walked';
+}
+
+// ----- starter -----
+function offerStarter() {
+  const t = document.getElementById('toast'), offer = starterOffer(WORLD.SEED);
+  document.getElementById('tSp').textContent = 'Choose your first partner';
+  document.getElementById('tMeta').textContent = 'From ' + PACK.meta.name;
+  document.getElementById('tImg').style.display = 'none';
+  const acts = document.getElementById('tActs'); acts.innerHTML = '';
+  offer.forEach(sp => { const b = document.createElement('button'); b.textContent = sp.name; b.addEventListener('click', () => { const mon = makeMonster(state.save, { species: sp, level: 5, shiny: false, legendary: false }, null); addMonster(state.save, mon); state.save.starterChosen = true; state.save.seen[sp.id] = true; persistSave(); acts.innerHTML = ''; t.classList.remove('show'); renderTeam(); }); acts.appendChild(b); });
+  t.classList.add('show'); clearTimeout(t._h);
+}
+
+// ----- save persistence -----
+// Saves are per pack (same idea as the original app: one save slot per pack ID), so switching packs switches teams.
+const memStore = {};
+function saveKey() { return 'scouter-save:' + (PACK.meta.id || PACK.meta.name || 'demo'); }
+function persistSave() { try { localStorage.setItem(saveKey(), JSON.stringify(state.save)); } catch (e) { memStore[saveKey()] = JSON.stringify(state.save); } }
+function loadSave() {
+  let raw = null; try { raw = JSON.parse(localStorage.getItem(saveKey())); } catch (e) { try { raw = JSON.parse(memStore[saveKey()] || 'null'); } catch (_) { raw = null; } }
+  state.save = migrateSave(raw) || newSave();
+  // anything from another pack is quarantined to the box rather than crashing battles
+  const known = m => PACK.speciesById.has(m.speciesId);
+  const foreign = state.save.team.filter(m => !known(m)); if (foreign.length) { state.save.team = state.save.team.filter(known); state.save.box.push(...foreign); }
+  [...state.save.team, ...state.save.box].forEach(m => { if (known(m)) hydrate(m); });
+  if (!state.save.team.length) state.save.starterChosen = false;
+}
+let resetArmed = 0;
+document.getElementById('reset').addEventListener('click', e => {
+  if (Date.now() - resetArmed > 4000) { resetArmed = Date.now(); e.target.textContent = 'Tap again to wipe'; setTimeout(() => { e.target.textContent = 'Reset'; }, 4000); return; }
+  resetArmed = 0; e.target.textContent = 'Reset';
+  state.save = newSave(); persistSave(); state.battle = null; renderTeam(); offerStarter();
+});
+
+// ----- pack loading: scouter folder (pack.json + sprites) or GMS .bin -----
+const packInput = document.getElementById('packFiles'), binInput = document.getElementById('packBin');
+document.getElementById('loadBin').addEventListener('click', () => binInput.click());
+document.getElementById('load').addEventListener('click', () => packInput.click());
+binInput.addEventListener('change', async () => {
+  const f = binInput.files && binInput.files[0]; if (!f) return; binInput.value = '';
+  flash('Reading ' + f.name + ' (' + (f.size / 1048576).toFixed(1) + ' MB)…');
+  try {
+    const text = await f.text(); const raw = parseGmsBin(text);
+    if (isGmsPack(raw)) { const v = validateGmsPack(raw); if (!v.ok) { flash('Pack rejected: ' + v.errors.slice(0, 3).join('; ')); return; } applyPack(raw, new Map()); await savePack(raw, new Map(), 'gms'); flash('Loaded "' + PACK.meta.name + '": ' + PACK.speciesById.size + ' ' + PACK.keywords.monster + ', ' + PACK.habitats.length + ' families, ' + PACK.gyms.length + ' gym types, ' + PACK.images.size + ' images.'); }
+    else { const v = validatePack(raw); if (!v.ok) { flash('Pack rejected: ' + v.errors.slice(0, 3).join('; ')); return; } applyPack(raw, new Map()); await savePack(raw, new Map(), 'scouter'); flash('Loaded "' + raw.name + '" (no sprites — use the folder loader for sprites).'); }
+  } catch (e) { flash('Could not read pack: ' + e.message); }
+});
+packInput.addEventListener('change', async () => {
+  const files = Array.from(packInput.files || []); packInput.value = '';
+  const base = f => (f.webkitRelativePath || f.name).split('/').pop();
+  const bin = files.find(f => f.name.toLowerCase().endsWith('.bin'));
+  if (bin) { const text = await bin.text(); try { const raw = parseGmsBin(text); applyPack(raw, new Map()); await savePack(raw, new Map(), 'gms'); flash('Loaded GMS pack "' + PACK.meta.name + '".'); } catch (e) { flash('Could not read .bin: ' + e.message); } return; }
+  const jsonFile = files.find(f => base(f).toLowerCase() === 'pack.json') || files.find(f => f.name.toLowerCase().endsWith('.json'));
+  if (!jsonFile) { flash('No pack.json or .bin in the selection.'); return; }
+  let pack; try { pack = JSON.parse(await jsonFile.text()); } catch (e) { flash('pack.json is not valid JSON: ' + e.message); return; }
+  const v = validatePack(pack); if (!v.ok) { alert('Pack rejected:\n• ' + v.errors.slice(0, 12).join('\n• ')); return; }
+  const blobs = new Map(files.filter(f => /\.(png|jpe?g|gif|webp|svg)$/i.test(f.name)).map(f => [base(f), f]));
+  applyPack(pack, blobs); await savePack(pack, blobs, 'scouter');
+  const missing = pack.species.filter(s => s.sprite && !blobs.has(s.sprite)).length;
+  flash('Loaded "' + pack.name + '": ' + pack.families.length + ' families, ' + pack.species.length + ' species, ' + blobs.size + ' sprites' + (missing ? ' (' + missing + ' referenced sprites not found)' : '') + '.');
+});
+function applyPack(pack, blobs) {
+  setPack(pack);
+  sprites.forEach(u => URL.revokeObjectURL(u)); sprites.clear();
+  blobs.forEach((blob, name) => sprites.set(name, URL.createObjectURL(blob)));
+  loadSave();
+  document.getElementById('packName').textContent = PACK.meta.name + (PACK.meta.version ? ' v' + PACK.meta.version : '') + ' · ' + PACK.mode + ' battles';
+  state.battle = null; renderTeam(); osm.lastKey = ''; osmRefresh(true);
+  if (!state.save.starterChosen) offerStarter();
+}
+function idb() { return new Promise(res => { try { if (!window.indexedDB) return res(null); const req = indexedDB.open('scouter-packs', 1); req.onupgradeneeded = () => req.result.createObjectStore('kv'); req.onsuccess = () => res(req.result); req.onerror = () => res(null); } catch (e) { res(null); } }); }
+async function savePack(pack, blobs, kind) { const db = await idb(); if (!db) return; try { const tx = db.transaction('kv', 'readwrite'), st = tx.objectStore('kv'); st.put(kind === 'gms' ? JSON.stringify(pack) : pack, 'pack'); st.put(kind, 'kind'); st.put(Object.fromEntries(blobs), 'sprites'); await new Promise((r, j) => { tx.oncomplete = r; tx.onerror = () => j(tx.error); }); } catch (e) { console.warn('pack not persisted:', e.message); } }
+async function restorePack() {
+  const db = await idb(); if (!db) return;
+  try {
+    const tx = db.transaction('kv', 'readonly'), st = tx.objectStore('kv');
+    const get = k => new Promise(r => { const q = st.get(k); q.onsuccess = () => r(q.result); q.onerror = () => r(undefined); });
+    let pack = await get('pack'); const kind = await get('kind'), spr = await get('sprites');
+    if (typeof pack === 'string') pack = JSON.parse(pack);
+    if (pack && (kind === 'gms' ? validateGmsPack(pack).ok : validatePack(pack).ok)) applyPack(pack, new Map(Object.entries(spr || {})));
+  } catch (e) { console.warn('pack not restored:', e.message); }
+}
+
+loadSave();
+osmInit();
+setView(osm.ok ? 'map' : 'grid');
+fitCanvas();
+updateGpsBtn();
+requestAnimationFrame(tick);
+restorePack().then(() => { renderTeam(); if (!state.save.starterChosen) offerStarter(); if (navigator.geolocation && !state.sim) gpsStart(false); });
+</script>
+</body>
+</html>
