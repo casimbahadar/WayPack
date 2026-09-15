@@ -1,0 +1,77 @@
+# WayPack
+
+A creature-collecting game played on the real map. Every 500 m square of the world is a route with its own creatures. Nine routes make a domain, and nine domains make a region with eight gyms and a League. You walk to things. The same spot is the same route for every player.
+
+WayPack is an engine. It ships with no creature content. Everything you see, from species and sprites to gym leaders and badges, comes from a **pack** you load, so the app itself carries no franchise material.
+
+**Play now:** open the game on GitHub Pages (`index.html`), tap Menu, load a pack, and walk. Add it to your Home Screen: it keeps the whole screen, and on iPhone a Home Screen copy gets its own location permission when a browser tab will not. A website only receives your position while its page is on screen, so turn on *Keep the screen awake* for a long walk. For background walking with the phone locked, the Android shell in `waypack-android/` is the only route.
+
+## What the game has
+
+- A world laid out by coordinates: routes, domains, regions with generated names and lore, eight typed gyms and a League per region, three layouts and two route sizes.
+- Wild encounters per route family, catching with three tiers of catch item, eggs found by walking, shinies, regional variants, forms and evolutions by the pack's own rules.
+- Battles with type matchups, wind-ups you can read and guard, per-species move sets, TMs, held items, Mega Evolution in battle, and stats shaped by each species.
+- Gyms whose leaders grow with your badges, an Elite Four and Champion, title defence by leaders, elites, strong trainers, former champions and other players, and a League that can be lost and taken back.
+- Legends: three per region per month, one on a route each day once you are Champion, catchable, with a stay-or-roam rule when they escape.
+- Landmarks from OpenStreetMap: quiet places to visit for coins, and each week an evil team with its own name, motive and boss holding some of them.
+- Post-game: a rival, master rematches for gold badges, region mastery, Champion's Road, daily quests, a weekly shiny hunt, weekend tournaments and a monthly legend gauntlet.
+- A walking economy: coins per 25 m, a daily shop with drifting prices, paid healing.
+- Online, no account needed: ghosts of other players walking your region as trainers, friends by code, leaderboards, live battles by room code, trades and egg gifts by code, shared weekly evil teams, cloud saves.
+- Directions to anywhere: an address, a place name or coordinates, plus the gyms, League, legend, landmarks, pins and friends' regions the game already knows. Walking, cycling and driving each use their own router, with distance, duration and an arrival clock, spoken turns, and an edge arrow when the destination is off screen.
+- Six playthroughs per pack: each region layout and route size is its own team, box, badges and history, sharing only the coin purse.
+- Wanderers from neighbouring routes, and an optional migration that moves families between routes each month.
+- Area music from the Musical Forge engine, sound effects, spoken route notes, a team photo mode with friends' teams in frame, a dex, achievements, a weekly report, pins for your own places, a full in-game guide (Menu → How to play).
+- Offline map tiles, a low-power mode for long walks, and a connection panel that says which services are reachable.
+
+## Packs
+
+Two formats load from Menu → Pack:
+
+- **GMS `.bin`**: a GPS Monster Scouter pack, loaded as is.
+- **WayPack folder**: `pack.json` plus sprites, built by hand or with the tools in this repo.
+
+Each pack keeps its own six playthroughs. A pack may also carry its own music, and a badge-pool folder gives gyms varied badge art. The full format is in [PACK-FORMAT.md](PACK-FORMAT.md).
+
+Tools: `pack-build.mjs` (CSV → pack) and `pokeapi-to-pack.mjs` (PokéAPI CSV dump → full-battle pack).
+
+## Privacy
+
+Most of the game lives on the phone: save, pins, photos, settings. Online play is opt-in and needs no email or password. You pick a name and get a friend code. What leaves the phone when you play online is your trainer name, your team, your counts, and which region you are in, named to the same 3 km square everyone shares. Never your exact position, never your pins or photos. Tables in the backend are locked (row-level security, no direct access), and the only door is a fixed set of server functions keyed by your own token. Delete my online data, in the Online sheet, removes everything about you from the server. A second phone can take over the same trainer with a one-time link code, since a friend code alone must never hand over an account, and a cloud save never silently overwrites a newer copy from another device. Details are in [WAYPACK.md](WAYPACK.md).
+
+## Repository layout
+
+```
+index.html               the game, one file, no build step
+waypack.tests.mjs        engine harness: node waypack.tests.mjs
+waypack-sweep.cjs        end-to-end browser sweep (Playwright + a local server)
+forge-engine.js          Musical Forge engine, keep it beside the HTML
+badge-pool/              badges.png + badges.json, optional badge art
+pack-build.mjs, pokeapi-to-pack.mjs   pack tools
+waypack-android/         Capacitor Android project and CI workflow
+WAYPACK.md               design and decisions
+PACK-FORMAT.md           pack authoring guide
+EVIL-TEAMS.md            one generated profile per evil-team motive
+screenshots/             for sharing
+```
+
+## Running the harness
+
+```
+node waypack.tests.mjs
+```
+
+It extracts the engine from the shipped HTML and runs 342 checks against it, including the real pack when `poke9_data_v1_6_gmsdp2.bin` is present. Every rule in the game has a check, and balance claims are measured rather than asserted.
+
+`waypack-sweep.cjs` is the other half: it drives the whole app in a headless browser (battles, catching, every panel and tab, directions, slot switching, export and import, reset, reload) and fails on any JavaScript or console error. It found two real bugs on its first run. Serve the folder and run it with Playwright installed.
+
+## Android app (optional)
+
+`waypack-android/` wraps the same file in a native shell for background walking, notifications with the app closed, haptics and durable saves. Move its `.github/workflows/android.yml` into the repo's `.github/workflows/` and push. The workflow copies the game from the repo root, builds `app-debug.apk` on GitHub's runner and attaches it to the run. Install it over the previous one and the save carries over. See `waypack-android/SHIP.md`.
+
+## Credits
+
+Built by Casim Bahadar. The world model, layouts and rules are original. Map data © OpenStreetMap contributors. Landmark lookups through the Overpass API. GMS pack format by Tankenka, whose GPS Monster Scouter this began as a study of. Music engine from Musical Forge Studio (MIT). Base-stat table from PokéAPI. Franchise packs are the property of their owners and are not part of this repository.
+
+## Licence
+
+Engine: MIT. Packs you load are governed by their own owners' terms.
