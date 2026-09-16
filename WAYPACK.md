@@ -1,6 +1,6 @@
 # WayPack
 
-GPS creature-collecting game engine for the phone: real map, live GPS, the world as a fixed grid of routes; all creature content comes from loadable packs. Current build: `index.html` in the repo (development name `scouter-world-v79.html`; needs `forge-engine.js` beside it for music) (single file, no build step, Leaflet + OpenStreetMap tiles). Harness: `waypack.tests.mjs`, 337 checks against the shipped file, including the real Pokémon pack.
+GPS creature-collecting game engine for the phone: real map, live GPS, the world as a fixed grid of routes; all creature content comes from loadable packs. Current build: `index.html` in the repo (development name `scouter-world-v80.html`; needs `forge-engine.js` beside it for music) (single file, no build step, Leaflet + OpenStreetMap tiles). Harness: `waypack.tests.mjs`, 337 checks against the shipped file, including the real Pokémon pack.
 
 Name chosen 2026-09-04: **WayPack** (waypoints + packs). Rejected: Wayfarer (Niantic's mapping platform, a live AR exploration game, and several store apps share it), Wanderlands (a Play Store app, a dormant studio, a Roblox game). WayPack not yet searched for collisions; do that before any store listing.
 
@@ -92,7 +92,7 @@ Gym types: distinct within a region, and never shared with an edge-adjacent regi
 
 **Creatures.** 16 MBTI-keyed personalities with mood lines. XP bar and stats on every team row and in the battle card. Nicknames (used in battle) and a pin that blocks boxing.
 
-**How to play.** Menu → How to play: fourteen topics (Worlds and playthroughs was split out of Settings when that topic reached four screenfuls). A harness check greps the guide text for 37 features a player must be able to find, so a feature added without documentation fails the tests. Previously thirteen topics behind a picker (getting started, reading the map, directions, scanning and catching, battles and moves, gyms and the League, walking and the shop, legends, landmarks and evil teams, after the title, playing with others, photos and achievements, settings and packs), with Previous/Next and the last topic remembered. Rewritten in full at v52 to cover directions, the level cap, ace choice and records, ghost trainers, trades and gifts, cloud saves, photos, achievements and the six playthrough slots. Landmark markers answer a tap with name and status.
+**How to play.** Menu → How to play: fifteen topics (Saving, phones and hosting gathers the save file, the cloud, second-phone linking and the server choice, which were scattered across Playing with others and Settings) (Worlds and playthroughs was split out of Settings when that topic reached four screenfuls). A harness check greps the guide text for 37 features a player must be able to find, so a feature added without documentation fails the tests. Previously thirteen topics behind a picker (getting started, reading the map, directions, scanning and catching, battles and moves, gyms and the League, walking and the shop, legends, landmarks and evil teams, after the title, playing with others, photos and achievements, settings and packs), with Previous/Next and the last topic remembered. Rewritten in full at v52 to cover directions, the level cap, ace choice and records, ghost trainers, trades and gifts, cloud saves, photos, achievements and the six playthrough slots. Landmark markers answer a tap with name and status.
 
 **Cloud save.** `wp_cloud_save`/`wp_cloud_load`: the whole save under the trainer token, per pack; auto-saved after gym and League wins (at most every 10 minutes) and on demand; load replaces the local save after a confirmation.
 
@@ -161,6 +161,7 @@ A store build cannot contain franchise packs (Apple IP/copycat rules, Google Pla
 - 2026-09-04 Leader team sizes 2→5; Elite Four full teams at −4/−3/−3/−2; contenders of any kind every 4 h; losing the title hands it to the winner with their team.
 - 2026-09-04 Legends: monthly sets, daily route events, one attempt per day, Stay/Roam setting, unlock on Champion.
 - 2026-09-04 Name: WayPack. Distribution plan as above.
+- 2026-09-06 v80: saving, cloud, second phone and hosting gathered into their own guide topic.
 - 2026-09-06 v79: guide audited against the feature list, ten gaps filled, worlds split into their own topic, and a check added so the guide cannot fall behind again.
 - 2026-09-06 v78: lore pools expanded to 214 lines; capitalised placeholders; guide updated for the newer settings.
 - 2026-09-06 v77: worlds keep their own progress; lore pools roughly tripled.

@@ -3201,8 +3201,9 @@ document.getElementById('guideBtn').addEventListener('click', () => { const d = 
 
 
 // ----- what's new: shown once when the version changes -----
-const APP_VERSION = '79';
+const APP_VERSION = '80';
 const WHATS_NEW = {
+  '80': ['Saving, the cloud, using a second phone and choosing a server now have their own page in the guide, instead of being scattered through Playing with others and Settings.'],
   '79': ['The guide now covers everything: worlds and playthroughs have their own page, and the parts that were missing (free healing, evolution, voices, the starting pin, forgetting a region, sorting the region list, the camera tools, second-phone linking, wanderers and migration) are all written up.'],
   '78': ['Region lore is much deeper: over 200 things a region can say about itself, so no two read alike and no sentence is a signature.', 'The guide covers the newer settings: evolution, voices, shops, rest stops, worlds and where your game runs.'],
   '77': ['Worlds keep their own progress. Moving to another world parks your regions, badges and titles, and coming back finds them exactly as you left them. Creatures, coins, items and the dex travel with you.',
@@ -4451,8 +4452,7 @@ const GUIDE = [
 <p>After your wins, your team is published as a <b>ghost</b>. Friends' teams and other players' teams walk your region as trainers, one route a day each, drawn as glowing figures you can go and fight, and they challenge you at the League once you hold a title. Those fights are played by the app, not by the other person.</p>
 <p>Add friends by code, compare stats, and see leaderboards for badges, regions, mastery, tournaments, shinies and achievements. Your <b>trainer card</b> is a shareable image of your team and achievements with a QR code that adds you.</p>
 <div class="tip">For a <b>live battle</b>, one player creates a room and reads the six-letter code aloud. The other joins with it. Both phones run the same fight from a shared seed and exchange only the moves chosen each turn.</div>
-<p>To play the same trainer on a second phone, open <b>Cloud save</b> and tap <b>Use on another phone</b>. The first phone shows a link code good for fifteen minutes; the second enters your name, your friend code and that code, then loads your playthrough. A friend code alone can never take over an account, and the cloud refuses to overwrite a copy another phone has made since, offering you the newer one instead.</p>
-<p><b>Trades</b> swap a creature for a creature by code, keeping nicknames, items and history, and <b>egg gifts</b> send an egg one way for a friend to walk. <b>Cloud save</b> keeps a copy of this playthrough under your trainer code so a new phone can pick it up.</p>
+<p><b>Trades</b> swap a creature for a creature by code, keeping nicknames, items and history, and <b>egg gifts</b> send an egg one way for a friend to walk.</p>
 <p>No account, email or password is involved. A friend code lets someone see which region you are in, never where you are in it, and your pins and photos never leave the phone. <b>Delete my online data</b> removes everything from the server.</p>` },
   { id: 'photos', title: 'Photos and achievements', html: () => `<h3>Team photos</h3>
 <p>The Team panel opens the camera with your team standing in the frame. Drag any of them into place and take the photo. It is saved or shared straight from your phone, and never uploaded. Front or back camera both work, and where there is no camera a plain backdrop stands in.</p>
@@ -4461,6 +4461,18 @@ const GUIDE = [
 <div class="tip">Each week a region asks for one photo: at a named landmark, or with a member of that week's hunt family on your team. Taking it earns 60 coins.</div>
 <h3>Achievements</h3>
 <p>Twenty-one of them, from your first badge to mastering a region, shown on the You tab of Online. Tap any one to see what it takes and whether you have it. They also appear on your trainer card.</p>` },
+  { id: 'saves', title: 'Saving, phones and hosting', html: () => `<h3>Where your game lives</h3>
+<p>Everything is kept on the device you play on, straight away, with no save button. Each of the six playthroughs is stored separately, so nothing you do in one can disturb another.</p>
+<p><b>Backup</b>, under Data in the menu, writes the playthrough you are in to a file, and <b>Import</b> reads one back on any phone. That file is yours: it needs no account and no network.</p>
+<h3>The cloud</h3>
+<p>Once you have a trainer name, <b>Cloud save</b> in the Online sheet keeps a copy on the server under that trainer. It saves itself after gym and League wins, and <b>Save all six</b> sends every playthrough at once. <b>Load from cloud</b> and <b>Load all six</b> bring them back.</p>
+<div class="tip">The cloud never overwrites a newer copy quietly. If another phone has played since, this one says so, names the phone and the time, and offers you the newer copy or the chance to keep yours.</div>
+<h3>A second phone</h3>
+<p>To play the same trainer elsewhere, open <b>Cloud save</b> and tap <b>Use on another phone</b>. The first phone shows a link code good for fifteen minutes. The second enters your name, your friend code and that code, and becomes the same trainer. A friend code on its own can never take over an account, which is why the link code exists.</p>
+<p>Both phones are then the same trainer, but nothing syncs continuously. Save on the phone you finish with, load on the phone you start with, and you will never lose a walk.</p>
+<h3>Whose server</h3>
+<p><b>Server</b>, under Data, decides where your game runs. Cloud saves are almost the whole cost of running WayPack, so you can put yours on a server of your own while friends, ghosts, trades, leaderboards and live battles stay on the shared one. Online play is unaffected by that choice.</p>
+<p>You can also run everything on your own server, in which case only people using it can see you at all. Any server answering the WayPack functions will do, and the setting says which server holds what.</p>` },
   { id: 'worlds', title: 'Worlds and playthroughs', html: () => `<h3>Which world</h3>
 <p>Everyone starts in the same world: the same families on the same routes, the same gyms, the same names. Under <b>World</b> in the menu you can take a world of your own instead. The streets do not change, but what lives on them does, along with the gym types, the leaders, the region names and the teams that hold the landmarks. A creature you cannot find anywhere may be common on a friend's routes, which is what makes trading worth doing.</p>
 <p>Each world has a six-character code. Give yours to a friend and they see what you see, or enter theirs to join them. Every world keeps its own regions, badges and titles, so moving between them parks your work rather than losing it, and coming back finds it as you left it. Your creatures, coins, items and dex follow you everywhere.</p>
@@ -4476,8 +4488,7 @@ const GUIDE = [
 <p><b>Low power</b> takes a location fix about every 20 seconds instead of continuously, stops fetching new map tiles, pauses music and the online checks. Walking still counts and battles still work, and the battery lasts far longer on a two-hour walk.</p>
 <p>The map keeps every tile it draws, so streets you have already walked still appear with no signal at all. <b>Offline map</b> shows how many tiles are kept and clears them; <b>Connection</b> says what is reachable right now and how much map data this session used.</p>
 <p>All creatures come from a <b>pack</b>. Load a GMS .bin file or a WayPack folder from the menu, and optionally a badge pool folder that gives gyms varied badge art. Each pack keeps its own six playthroughs.</p>
-<div class="tip"><b>Backup</b> writes this playthrough to a file and <b>Import</b> reads it back on any phone. Cloud save does the same through your trainer code, and <b>Save all six</b> covers every playthrough at once.</div>
-<p><b>Server</b>, under Data, decides where your game runs. Cloud saves are almost all of the cost of running WayPack, so you can put yours on a server of your own while friends, ghosts, trades and leaderboards stay on the shared one, which changes nothing about playing with other people. Running everything on your own server is possible too, and then only people using it can see you.</p>
+
 <p><b>Pins</b> mark home, work, exercise, school or a named place at your current position. They stay on this phone, and they show up as destinations in Directions.</p>` },
 ];
 const guideSheet = document.getElementById('guide'), guideTopic = document.getElementById('guideTopic');

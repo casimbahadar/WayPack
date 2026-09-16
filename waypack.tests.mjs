@@ -1519,7 +1519,15 @@ for (const [label, E, layout] of [['GMS domains', GMS, 'league'], ['GMS dense', 
   const wants = { 'worlds and codes': /world of your own/i, 'per-world progress': /parks your work|as you left/i, 'playthroughs': /six/i, 'shops': /mall/i, 'rest stops': /rest stop/i, 'free heals': /five times a day/i, 'evolution setting': /Ask me/i, 'voice chooser': /which of your phone/i, 'spoken directions': /spoken directions/i, 'route notes': /route notes/i, 'starting pin': /Start here/i, 'forget a region': /Forget this region/i, 'region sorting': /Sort them by/i, 'camera tools': /Who is in it/i, 'second phone': /link code/i, 'cloud all six': /Save all six/i, 'server': /Server/i, 'wanderers': /Wanderers/i, 'migration': /Migration/i, 'low power': /Low power/i, 'offline tiles': /Offline map|tiles you have seen/i, 'connection': /Connection/i, 'screen awake': /screen awake/i, 'travel modes': /cycling/i, 'level cap': /leader's level/i, 'trades': /Trades/i, 'egg gifts': /Egg gifts|egg gift/i, 'live battles': /live battle/i, 'ghosts': /ghost/i, 'evil teams': /evil team/i, 'legends': /legend/i, 'quests': /daily quest/i, 'shiny hunt': /shiny hunt/i, 'achievements': /achievement/i, 'dex': /Dex|dex/i, 'packs': /pack/i, 'GPS trouble': /Precise Location/i };
   const missing = Object.entries(wants).filter(([, re]) => !re.test(text)).map(([k]) => k);
   check('the guide names every part of the game a player has to find', missing.length === 0, missing.length ? 'missing: ' + missing.join(', ') : topics.length + ' topics, ' + text.split(' ').length + ' words');
-  check('no single topic runs past about two screenfuls', topics.length >= 14, topics.length + ' topics');
+  check('the guide is split finely enough that no topic is a wall of text', topics.length >= 15 && /Saving, phones and hosting/.test(g), topics.length + ' topics');
+}
+
+
+{
+  const g2 = html.slice(html.indexOf("{ id: 'saves'"), html.indexOf("{ id: 'worlds'"));
+  check('saving, the cloud, a second phone and hosting are all in one place', /Backup/.test(g2) && /Save all six/.test(g2) && /link code/.test(g2) && /Server/.test(g2) && /never overwrites a newer copy/.test(g2));
+  const online = html.slice(html.indexOf("{ id: 'online'"), html.indexOf("{ id: 'photos'"));
+  check('and are no longer repeated in Playing with others', !/Save all six|link code|Use on another phone/.test(online));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
