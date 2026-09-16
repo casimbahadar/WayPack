@@ -1794,7 +1794,8 @@ function usurperDefended(save, g) { const r = save.badges[regionKey(g.gx, g.gy)]
 
 // ===== Legendaries: per-region monthly set, one active per day on a route, unlocked by becoming Champion =====
 const LEGEND = { PER_REGION: 3, ROAM: false };
-const SHINY = { ODDS: 1024 };   // 1 in 1024 on scans, eggs and legends
+const SHINY = { ODDS: 512 };   // 1 in 512 on scans and eggs. The weekly hunt family is 1 in 64.
+const LEGEND_SHINY = { ODDS: 128, WATCHED: 64 };   // legends are rarer to meet, so a shiny one is not made rarer still
 function seasonOf(now) { const d = new Date(now); return d.getUTCFullYear() * 12 + d.getUTCMonth(); }
 function legendUnlocked(save, gx, gy) { const r = save.badges[regionKey(gx, gy)]; return !!(r && r.champion > 0); }
 // The region's legendaries this month: distinct rare families found on its routes, up to PER_REGION, each resolved to one species.
@@ -1820,7 +1821,16 @@ function activeLegend(save, gx, gy, day, now) {
   const rx = gx * side + h % side, ry = gy * side + (h >>> 8) % side;
   return { ...pick, region: key, gx, gy, rx, ry, routeNo: routeNumber(rx, ry), attempted: L.attempts[key] === day, species: PACK.speciesById.get(pick.speciesId) };
 }
-function legendEncounter(save, leg, teamLevel, day) { return { legendary: true, species: leg.species, level: Math.max(leg.minlvl || 50, teamLevel), shiny: Math.floor(rng(hash32(leg.gx, leg.gy, day | 0, strHash(leg.speciesId), 2501))() * SHINY.ODDS) === 0 }; }
+function watchedLegend(gx, gy, week) {   // the legend this region is watching this week, by index into its set
+  const n = LEGEND.PER_REGION || 3; return hash32(gx, gy, week, 3301) % n;
+}
+function isWatched(gx, gy, week, leg, legs) {
+  if (!leg || !legs || !legs.length) return false;
+  const i = legs.findIndex(x => x.speciesId === leg.speciesId); if (i < 0) return false;
+  return i === watchedLegend(gx, gy, week) % legs.length;
+}
+function legendShinyOdds(gx, gy, week, leg, legs) { return isWatched(gx, gy, week, leg, legs) ? LEGEND_SHINY.WATCHED : LEGEND_SHINY.ODDS; }
+function legendEncounter(save, leg, teamLevel, day, odds) { return { legendary: true, watched: odds === LEGEND_SHINY.WATCHED, species: leg.species, level: Math.max(leg.minlvl || 50, teamLevel), shiny: Math.floor(rng(hash32(leg.gx, leg.gy, day | 0, strHash(leg.speciesId), 2501))() * (odds || LEGEND_SHINY.ODDS)) === 0 }; }
 // Outcome of an attempt: 'caught' | 'failed'. Failing may send it roaming to a neighbouring region.
 function legendAttempt(save, leg, outcome, day, now) {
   const L = legendState(save), season = seasonOf(now); L.attempts[leg.region] = day;
@@ -2591,7 +2601,9 @@ function updateHud() {
   { const rb = document.getElementById('rivalBtn'); const due = state.save && !state.battle ? rivalDue(state.save) : null; if (due) { const rv = rivalOf(state.save); rb.style.display = 'block'; rb.textContent = rv.name + ' wants a battle after ' + due.label; rb.onclick = () => { if (firstAble(state.save) < 0) { flash('Heal first.'); return; } const rt = rivalTeam(state.save, due); const foes = rt.team.map(e => trainerInstance(e, rt.name + '’s ')); startBattle('rival', foes, { rival: rt, milestone: due }, '"Been watching you. Show me." ' + rt.name + ' sends out ' + PACK.speciesById.get(foes[0].speciesId).name + '!'); }; } else rb.style.display = 'none'; }
   { const leg = state.save ? activeLegend(state.save, d.gx, d.gy, dayIndex(Date.now()), Date.now()) : null; const hl = document.getElementById('hLegend'), lb = document.getElementById('legendBtn'); state.legend = leg;
     if (leg) { const lc = cellCenter(leg.rx, leg.ry), ld = haversineM(state.lat, state.lon, lc.lat, lc.lon); if (!leg.attempted) maybeNotify('leg:' + leg.region + ':' + dayIndex(Date.now()) + ':' + leg.speciesId, leg.species.name + ' is out today', 'On route ' + leg.routeNo + ' in ' + d.region + ', ' + fmtD(ld) + ' away.'); hl.style.display = 'block'; hl.textContent = '★ ' + leg.species.name + (leg.roamed ? ' (roamed here)' : '') + ' on route ' + leg.routeNo + ', ' + (d.rx === leg.rx && d.ry === leg.ry ? 'here' : fmtD(ld) + ' ' + compass(bearingDeg(state.lat, state.lon, lc.lat, lc.lon))) + (leg.attempted ? '. You have had your attempt today.' : '');
-      const here = d.rx === leg.rx && d.ry === leg.ry && !state.battle; lb.style.display = here ? 'block' : 'none'; lb.textContent = leg.attempted ? '★ ' + leg.species.name + ' is here, but you have tried today' : '★ Approach ' + leg.species.name; lb.disabled = !!leg.attempted; }
+      const here = d.rx === leg.rx && d.ry === leg.ry && !state.battle; lb.style.display = here ? 'block' : 'none'; const watched = isWatched(d.gx, d.gy, weekIndex(Date.now()), leg, regionLegends(d.gx, d.gy, seasonOf(Date.now())));
+        lb.textContent = leg.attempted ? '★ ' + leg.species.name + ' is here, but you have tried today' : (watched ? '✦ Approach ' + leg.species.name + ' (watched this week)' : '★ Approach ' + leg.species.name);
+        lb.disabled = !!leg.attempted; lb.style.background = watched && !leg.attempted ? 'var(--gold)' : ''; lb.style.color = watched && !leg.attempted ? 'var(--gold-ink)' : ''; }
     else { hl.style.display = 'none'; lb.style.display = 'none'; } }
   const pill = document.getElementById('gpsPill');
   const gq = state.gps;
@@ -2963,7 +2975,8 @@ function osmRefresh(force) {
     const cb = cellBounds(rx, ry), here = rx === d.rx && ry === d.ry;
     if (drawCells) osm.cells.addLayer(L.rectangle([[cb.lat0, cb.lon0], [cb.lat1, cb.lon1]], { color: '#0f1418', weight: here ? 3 : 0.5, opacity: 0.6, fillColor: PACK.habitats[routeHabitat(rx, ry)].color, fillOpacity: here ? 0.55 : 0.28, interactive: false, pane: 'cells' }));
     const m = macroOf(rx, ry), g = gymOf(m.mx, m.my);
-    { const side = WORLD.MACRO * WORLD.REGION; if (mod(rx, side) === 0 && mod(ry, side) === 0) { const b0 = cellBounds(rx, ry), b1 = cellBounds(rx + side - 1, ry + side - 1); osm.gyms.addLayer(L.rectangle([[b0.lat0, b0.lon0], [b1.lat1, b1.lon1]], { color: '#ffffff', weight: 3, opacity: 0.8, fill: false, interactive: false, pane: 'gyms' })); } }
+    { const side = WORLD.MACRO * WORLD.REGION; if (mod(rx, side) === 0 && mod(ry, side) === 0) { const b0 = cellBounds(rx, ry), b1 = cellBounds(rx + side - 1, ry + side - 1); osm.gyms.addLayer(L.rectangle([[b0.lat0, b0.lon0], [b1.lat1, b1.lon1]], { color: '#10201c', weight: 9, opacity: 0.5, fill: false, interactive: false, pane: 'gyms' }));
+      osm.gyms.addLayer(L.rectangle([[b0.lat0, b0.lon0], [b1.lat1, b1.lon1]], { color: '#ffd166', weight: 3.5, opacity: 0.98, dashArray: '12 7', fill: false, interactive: false, pane: 'gyms' })); } }
     if (WORLD.MACRO > 1 && mod(rx, WORLD.MACRO) === 0 && mod(ry, WORLD.MACRO) === 0 && (!drawCells || z >= 13)) {       // domain outline once per domain
       const mb0 = cellBounds(m.mx * WORLD.MACRO, m.my * WORLD.MACRO), mb1 = cellBounds(m.mx * WORLD.MACRO + WORLD.MACRO - 1, m.my * WORLD.MACRO + WORLD.MACRO - 1);
       osm.gyms.addLayer(L.rectangle([[mb0.lat0, mb0.lon0], [mb1.lat1, mb1.lon1]], { color: g.league ? '#e8c33a' : (g.gym.color || '#fff'), weight: 2, opacity: 0.7, fill: false, interactive: false, pane: 'gyms' }));
@@ -3201,8 +3214,14 @@ document.getElementById('guideBtn').addEventListener('click', () => { const d = 
 
 
 // ----- what's new: shown once when the version changes -----
-const APP_VERSION = '80';
+const APP_VERSION = '83';
 const WHATS_NEW = {
+  '83': ['Corrected: ordinary shiny odds are 1 in 512 on scans and eggs, not 1 in 128. The week\'s hunt family is still 1 in 64.',
+    'Legends keep the better odds: 1 in 128, and 1 in 64 for the legend a region is watching that week.'],
+  '82': ['Shiny odds on scans and eggs are now 1 in 512, and the week\'s hunt family stays at 1 in 64.',
+    'Legends are better: 1 in 128 normally, and each week a region watches one of its legends, which is 1 in 64 on the day it appears. The approach button says when a legend is watched.'],
+  '81': ['Region borders are visible now: a gold dashed line with a dark casing, instead of a white hairline that disappeared on pale streets.',
+    'Travel to a pin you walked to. Open Pins and tap Travel, and you are standing there without walking. It works when live GPS is not placing you, and arriving earns nothing: no distance, no coins, no egg progress. Everything else works, so the good hunting spot is there at eleven at night.'],
   '80': ['Saving, the cloud, using a second phone and choosing a server now have their own page in the guide, instead of being scattered through Playing with others and Settings.'],
   '79': ['The guide now covers everything: worlds and playthroughs have their own page, and the parts that were missing (free healing, evolution, voices, the starting pin, forgetting a region, sorting the region list, the camera tools, second-phone linking, wanderers and migration) are all written up.'],
   '78': ['Region lore is much deeper: over 200 things a region can say about itself, so no two read alike and no sentence is a signature.', 'The guide covers the newer settings: evolution, voices, shops, rest stops, worlds and where your game runs.'],
@@ -3410,7 +3429,10 @@ document.getElementById('scan').addEventListener('click', () => {
 document.getElementById('legendBtn').addEventListener('click', () => {
   const leg = state.legend; if (!leg || state.battle || leg.attempted) return;
   if (firstAble(state.save) < 0) { flash('Your team is out of HP. Heal first.'); return; }
-  const enc = legendEncounter(state.save, leg, teamLevel(state.save), dayIndex(Date.now())); playCue('rare.wav'); if (enc.shiny) playCue('shiny.mp3');
+  const dsc = describe(state.lat, state.lon), wk = weekIndex(Date.now());
+  const legsHere = regionLegends(dsc.gx, dsc.gy, seasonOf(Date.now()));
+  const odds = legendShinyOdds(dsc.gx, dsc.gy, wk, leg, legsHere);
+  const enc = legendEncounter(state.save, leg, teamLevel(state.save), dayIndex(Date.now()), odds); playCue('rare.wav'); if (enc.shiny) playCue('shiny.mp3');
   const d = describe(state.lat, state.lon);
   startBattle('legend', [wildInstance(enc)], { enc, leg, where: { region: d.region, route: d.routeNo } }, '★ ' + leg.species.name + ' turns to face you. Lv ' + enc.level);
 });
@@ -3686,7 +3708,7 @@ function renderTeam() {
     qs.forEach(q => { const el = document.createElement('div'); el.className = 'mon'; el.innerHTML = '<span class="nm">' + q.text + '<br><small>' + Math.min(q.prog, q.target).toFixed(q.id === 'walk' ? 1 : 0) + ' of ' + q.target + (q.claimed ? ', claimed' : q.done ? ', done' : '') + '</small></span>'; if (q.done && !q.claimed) { const b = document.createElement('button'); b.textContent = 'Claim ' + POST.QUEST_COINS; b.addEventListener('click', () => { if (questClaim(state.save, day, q.id)) { persistSave(); renderTeam(); flash('+' + POST.QUEST_COINS + ' ' + COIN.NAME); } }); el.appendChild(b); } pq.appendChild(el); });
     const d0 = describe(state.lat, state.lon); const hf = PACK.habitats[huntFamily(d0.gx, d0.gy, weekIndex(Date.now()))]; const rv = state.save.rival ? rivalOf(state.save) : null;
     const pch = photoChallengeDone(state.save, d0.gx, d0.gy, weekIndex(Date.now())) ? null : photoChallenge(d0.gx, d0.gy, weekIndex(Date.now()));
-    const n = document.createElement('div'); n.className = 'meta'; n.innerHTML = (pch ? 'Photo challenge this week in ' + d0.region + ': <b>' + pch.text + '</b>, 60 ' + COIN.NAME + '. ' : 'Photo challenge done this week. ') + 'Shiny hunt this week in ' + d0.region + ': <b>' + hf.name + '</b>, 1 in ' + POST.HUNT_ODDS + ' on those routes.' + (rv ? ' Rival ' + rv.name + ': ' + rv.record.wins + ' wins, ' + rv.record.losses + ' losses.' : ''); pq.appendChild(n); }
+    const n = document.createElement('div'); n.className = 'meta'; n.innerHTML = (pch ? 'Photo challenge this week in ' + d0.region + ': <b>' + pch.text + '</b>, 60 ' + COIN.NAME + '. ' : 'Photo challenge done this week. ') + 'Shiny hunt this week in ' + d0.region + ': <b>' + hf.name + '</b>, 1 in ' + POST.HUNT_ODDS + ' on those routes.' + (() => { const lg = regionLegends(d0.gx, d0.gy, seasonOf(Date.now())); if (!lg.length) return ''; const w = lg[watchedLegend(d0.gx, d0.gy, weekIndex(Date.now())) % lg.length]; const sp = PACK.speciesById.get(w.speciesId); return sp ? ' Watched legend: <b>' + esc(sp.name) + '</b>, 1 in ' + LEGEND_SHINY.WATCHED + ' on the day it appears.' : ''; })() + (rv ? ' Rival ' + rv.name + ': ' + rv.record.wins + ' wins, ' + rv.record.losses + ' losses.' : ''); pq.appendChild(n); }
   { const pw = document.getElementById('pWeek'); const since = Date.now() - 7 * 86400000; const ev = state.save.history.filter(e => e.t >= since); const n = t => ev.filter(e => e.type === t).length; const regs = new Set(ev.map(e => e.name).filter(Boolean)); const km = (state.save.weekKm || {})[weekIndex(Date.now())] || 0;
     const parts = [];
     if (km) parts.push(km.toFixed(1) + ' km walked');
@@ -4054,11 +4076,34 @@ function startEvilBattle(enc, d) {
 const PIN_KINDS = [{ id: 'home', label: 'Home', icon: '⌂', color: '#f2b544' }, { id: 'work', label: 'Work', icon: '▣', color: '#7fa8ff' }, { id: 'exercise', label: 'Exercise', icon: '⚑', color: '#4fb07a' }, { id: 'school', label: 'School', icon: '✎', color: '#d985b8' }, { id: 'other', label: 'Other', icon: '●', color: '#9fb0aa' }];
 function loadPins() { try { return JSON.parse(localStorage.getItem('scouter-pins') || '[]'); } catch (e) { return []; } }
 function savePins(p) { try { localStorage.setItem('scouter-pins', JSON.stringify(p)); } catch (e) {} }
-function addPinHere(kindId, label) { const pins = loadPins(); pins.push({ id: 'p' + Date.now(), kind: kindId, label: label || '', lat: state.lat, lon: state.lon }); savePins(pins); osm.lastKey = ''; osmRefresh(true); renderPins(); }
-function renderPins() { const el = document.getElementById('pinList'); if (!el) return; el.innerHTML = ''; const pins = loadPins(); if (!pins.length) { el.textContent = 'No pins yet.'; return; } const home = homePin(); pins.forEach(pn => { const k = PIN_KINDS.find(x => x.id === pn.kind) || PIN_KINDS[4]; const row = document.createElement('div'); row.className = 'mon'; const d = describe(pn.lat, pn.lon); row.innerHTML = '<span class="ph" style="background:' + k.color + ';width:14px;height:14px;flex:0 0 14px;border-radius:50%"></span><span class="nm">' + (pn.label || k.label) + '<br><small>' + k.label + ', ' + d.region + ' route ' + d.routeNo + ', ' + (haversineM(state.lat, state.lon, pn.lat, pn.lon) < 50 ? 'here' : fmtDist(haversineM(state.lat, state.lon, pn.lat, pn.lon)) + ' ' + compass(bearingDeg(state.lat, state.lon, pn.lat, pn.lon))) + '</small></span>'; const st = document.createElement('button'); st.textContent = (home && home.id === pn.id) ? '★ Start' : 'Start here'; if (home && home.id === pn.id) st.classList.add('on'); st.addEventListener('click', () => { const on = !(home && home.id === pn.id); setHomePin(on ? pn.id : null); flash(on ? 'The game will open at ' + (pn.label || k.label) + ' when there is no live GPS.' : 'No starting pin; the game opens where it last left you.', 6000); }); row.appendChild(st); const del = document.createElement('button'); del.textContent = 'Remove'; del.addEventListener('click', () => { savePins(loadPins().filter(x => x.id !== pn.id)); osm.lastKey = ''; osmRefresh(true); renderPins(); }); row.appendChild(del); el.appendChild(row); }); }
+function addPinHere(kindId, label) { const pins = loadPins(); pins.push({ id: 'p' + Date.now(), kind: kindId, label: label || '', lat: state.lat, lon: state.lon, walked: !!state.gps.fixed }); savePins(pins); osm.lastKey = ''; osmRefresh(true); renderPins(); }
+function renderPins() { const el = document.getElementById('pinList'); if (!el) return; el.innerHTML = ''; const pins = loadPins(); if (!pins.length) { el.textContent = 'No pins yet.'; return; } const home = homePin(); pins.forEach(pn => { const k = PIN_KINDS.find(x => x.id === pn.kind) || PIN_KINDS[4]; const row = document.createElement('div'); row.className = 'mon'; const d = describe(pn.lat, pn.lon); row.innerHTML = '<span class="ph" style="background:' + k.color + ';width:14px;height:14px;flex:0 0 14px;border-radius:50%"></span><span class="nm">' + (pn.label || k.label) + '<br><small>' + k.label + ', ' + d.region + ' route ' + d.routeNo + ', ' + (haversineM(state.lat, state.lon, pn.lat, pn.lon) < 50 ? 'here' : fmtDist(haversineM(state.lat, state.lon, pn.lat, pn.lon)) + ' ' + compass(bearingDeg(state.lat, state.lon, pn.lat, pn.lon))) + (pn.walked ? '' : ', placed without a fix') + '</small></span>'; const tv = document.createElement('button'); tv.textContent = 'Travel';
+    tv.disabled = !pinTravelReady(pn) || haversineM(state.lat, state.lon, pn.lat, pn.lon) < 60;
+    tv.title = pinTravelReady(pn) ? 'Stand here without walking' : 'Only pins you placed on the spot';
+    tv.addEventListener('click', () => { if (travelToPin(pn)) { menu.classList.remove('show'); } });
+    row.appendChild(tv);
+    const st = document.createElement('button'); st.textContent = (home && home.id === pn.id) ? '★ Start' : 'Start here'; if (home && home.id === pn.id) st.classList.add('on'); st.addEventListener('click', () => { const on = !(home && home.id === pn.id); setHomePin(on ? pn.id : null); flash(on ? 'The game will open at ' + (pn.label || k.label) + ' when there is no live GPS.' : 'No starting pin; the game opens where it last left you.', 6000); }); row.appendChild(st); const del = document.createElement('button'); del.textContent = 'Remove'; del.addEventListener('click', () => { savePins(loadPins().filter(x => x.id !== pn.id)); osm.lastKey = ''; osmRefresh(true); renderPins(); }); row.appendChild(del); el.appendChild(row); }); }
 function fmtDist(m) { return m >= 1000 ? (m / 1000).toFixed(1) + ' km' : Math.round(m) + ' m'; }
 // Starting point: without GPS the game has to open somewhere. A pin can be that somewhere,
 // so playing at a desk (or on a phone you would rather not share a location with) starts on your own streets.
+// Somewhere you walked to and pinned can be returned to without walking, but only when live GPS is not
+// the thing placing you, and arriving earns nothing: no distance, no coins, no egg progress.
+// The walking is still the walking. This only saves you the second trip at eleven at night.
+function pinTravelReady(pn) { return !!(pn && pn.walked); }
+function canTravel() { return !state.gps.fixed; }
+function travelToPin(pn) {
+  if (!pinTravelReady(pn)) { flash('You can only travel to a pin you placed while standing there.', 7000); return false; }
+  if (!canTravel()) { flash('Live GPS is placing you right now. Turn Position to the simulator to travel to a pin.', 8000); return false; }
+  state.lat = pn.lat; state.lon = pn.lon; lastFix = null;
+  state.lastRouteKey = ''; state.lastLmKey = ''; state.lastNeighbourKey = ''; state.lastFitKey = ''; osm.lastKey = '';
+  if (osm.map) { osm.programmatic = true; osm.map.setView([pn.lat, pn.lon], 16); osm.programmatic = false; }
+  document.getElementById('trainersBar').dataset.key = '';
+  updateHud(); osmRefresh(true); renderPins();
+  const d = describe(state.lat, state.lon);
+  flash('At ' + (pn.label || pinKindLabel(pn)) + ': ' + d.region + ' route ' + d.routeNo + ', ' + d.habitatName.replace(/ Family$/i, '') + '. Walking earns nothing from here, but everything else works.', 9000);
+  return true;
+}
+function pinKindLabel(pn) { const k = PIN_KINDS.find(x => x.id === pn.kind); return k ? k.label : 'that pin'; }
 function homePin() { try { const id = localStorage.getItem('scouter-home'); return id ? loadPins().find(p2 => String(p2.id) === id) || null : null; } catch (e) { return null; } }
 function setHomePin(id) { try { if (id == null) localStorage.removeItem('scouter-home'); else localStorage.setItem('scouter-home', String(id)); } catch (e) {} renderPins(); }
 document.getElementById('pinAdd').addEventListener('click', () => { const t = document.getElementById('toast'); document.getElementById('tSp').textContent = 'Pin this spot as'; document.getElementById('tMeta').textContent = 'Pins are yours only and stay on this device.'; document.getElementById('tImg').style.display = 'none'; const acts = document.getElementById('tActs'); acts.innerHTML = ''; PIN_KINDS.forEach(k => { const b = document.createElement('button'); b.textContent = k.icon + ' ' + k.label; b.addEventListener('click', () => { const label = k.id === 'other' ? (prompt('Name this place:', '') || '') : ''; addPinHere(k.id, label); t.classList.remove('show'); flash('Pinned ' + (label || k.label) + ' here.'); }); acts.appendChild(b); }); const c = document.createElement('button'); c.textContent = 'Cancel'; c.addEventListener('click', () => t.classList.remove('show')); acts.appendChild(c); menu.classList.remove('show'); t.classList.add('show'); });
@@ -4382,6 +4427,7 @@ const GUIDE = [
 <p>WayPack plays on the real map. Every ${WORLD.ROUTE_M} m square is a <b>route</b>. Routes group into <b>domains</b>, and nine domains make a <b>region</b> with its own name, eight gyms and a League. The layout comes from the coordinates themselves, so the route you are standing on is the same route for every player.</p>
 <p>Walking moves you between routes and earns coins, catch items and eggs. The header shows the region, the route number, the family of creatures that lives on this route, and the nearest gym or League with its distance.</p>
 <div class="tip"><b>A good first ten minutes:</b> choose a starter, tap <b>Scan route</b> and catch or beat what appears, then walk toward the gym named in the header. The ◈ button on the map gives you directions to it.</div>
+<p><b>Travelling to a pin.</b> A pin you placed while actually standing somewhere can be returned to without walking there again: open Pins and tap <b>Travel</b>. It works when live GPS is not placing you, so at a desk or with the simulator on, and arriving earns nothing at all: no distance, no coins, no egg progress. Everything else works normally, so the spot you found for shiny hunting is there at eleven at night. A pin placed without a GPS fix cannot be travelled to, because you were never there.</p>
 <p>You can also play without walking. In the menu, <b>Position</b> switches between live GPS and a simulator with a walking pad. Under <b>Pins</b>, any pin can be marked <b>Start here</b>: without live GPS the game opens at that spot instead of wherever it last left you, which is what makes playing at a desk, or on a device you would rather not give a location to, work on streets you know.</p>
 <p><b>Spoken route notes</b>, in the menu, has the phone say each new route as you reach it: the route number, the family that lives there, and any gym or the League. Useful when the phone is in a pocket or a cradle.</p>
 <div class="tip"><b>If the map puts you in the wrong place:</b> the pill at the top right says what your phone is giving. "Finding you" means no fix has arrived yet and the dot is faded because the app does not know where you are. "Rough" means the fix is too vague to count your walking. Tap the pill to ask for a fresh position. On iPhone each browser keeps its own location permission, so check Settings for the browser you use, with Precise Location on, and if a tab still gives nothing, add WayPack to your Home Screen and open it from there.</div>` },
@@ -4436,6 +4482,7 @@ const GUIDE = [
   { id: 'legends', title: 'Legends', html: () => `<h3>Where legends appear</h3>
 <p>Each region holds up to three legendary creatures a month, drawn from the rare families on its own routes and redrawn on the first of the month. Once you are Champion of the region, one of them is on a route each day. A purple marker shows the route, and the header gives the distance and direction.</p>
 <p>Walk to that route and tap <b>Approach</b>. The legend fights at its own minimum level or your team's level, whichever is higher, and can be caught. Whatever happens, that was the region's one attempt for the day.</p>
+<div class="tip">A legend has a better chance of being shiny than anything else, 1 in 128 rather than 1 in 512, because you only meet one a day. Each week a region also watches one of its three legends: on the day that one appears its chance is 1 in 64, and the approach button says it is watched. The region's This week tab names it, so you know which week is worth the walk.</div>
 <div class="tip">The <b>Legends that escape</b> setting decides what a legend does after a flee, a run or a wipe. <b>Stay</b> keeps it in the region for tomorrow. <b>Roam</b> moves it to a neighbouring region, and it keeps moving each time it escapes until it is caught.</div>
 <p>A caught legend is gone from that region until the set is redrawn. The region's lore names a legend's route only on a day it is really there.</p>` },
   { id: 'teams', title: 'Landmarks and evil teams', html: () => `<h3>Places on the map that matter</h3>
