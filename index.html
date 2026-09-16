@@ -255,7 +255,7 @@
       <div class="item"><div class="lbl">Position<small id="gpsDesc">Live GPS follows your phone. Simulator lets you walk with a pad.</small></div><button id="gps">Live GPS</button></div>
       <div class="item"><div class="lbl">Keep the screen awake<small id="wakeDesc">Stops the phone locking while you play, so your position keeps updating. A locked screen stops a website tracking you at all</small></div><button id="wakeBtn">Off</button></div>
       <div class="item"><div class="lbl">Low power<small id="lowDesc">Fewer location fixes, no new map tiles, online checks paused. For long walks</small></div><button id="lowPower">Off</button></div>
-      <div class="item"><div class="lbl">Battle at the leader's level<small>In gym and League battles your creatures are capped to the leader's level (or a few below), so a strong team still gets a real fight</small></div><button id="handicap">Off</button></div>
+      <div class="item"><div class="lbl">Battle at the leader's level<small>In every serious battle (gyms, the League, title defences, rematches, tournaments, Champion's Road, your rival, the evil team, the legend gauntlet and other players' teams) your creatures are capped to the strongest opponent's level, or a few below. Wild creatures, route trainers and legends themselves are untouched</small></div><button id="handicap">Off</button></div>
       <div class="item"><div class="lbl">Evolution<small id="evoDesc">Creatures evolve as soon as they are ready</small></div><button id="evoAsk">Automatic</button></div>
       <div class="item"><div class="lbl">Legends that escape<small>Stay in their region for tomorrow, or roam to a neighbouring region you must chase</small></div><button id="roam">Stay</button></div>
       <div class="item"><div class="lbl">Voice<small id="voiceWho">The phone's own voices. Pick one, and how high and how fast it speaks</small></div><button id="voicePick">Choose</button></div>
@@ -337,7 +337,8 @@ function leagueIndexOf(gx, gy) { if (WORLD.LAYOUT === 'league') return LEAGUE_IN
 function isLeagueDomain(gx, gy, mi) { return mi === leagueIndexOf(gx, gy); }
 function gymsPerRegion() { return WORLD.REGION * WORLD.REGION - 1; }
 // ===== Gym tunables =====
-const HANDICAP = { OFFSET: null };   // null: off; 0/-1/-3/-5: in gym and League battles your team is capped to the leader's level + offset
+const CAPPED_BATTLES = new Set(['gym', 'league', 'master', 'champdef', 'tourney', 'road', 'rival', 'evil', 'defence', 'gauntlet', 'gtrainer']);
+const HANDICAP = { OFFSET: null };   // null: off; 0/-1/-3/-5: in every serious battle your team is capped to the leader's level + offset
 const GYM = {
   BASE_LEVEL: 8, PER_BADGE: 5,          // leader level = 8 + 5 × total badges (rematches scale with you)
   ACE_BONUS: 3,                         // ace sits above the rest of the team
@@ -820,7 +821,9 @@ function encounter(lat, lon, teamLevel, badges, seed) {
   const m = habitatMember(hab, level, r);
   level = Math.max(m.min, Math.min(m.max, level));
   const hunt = huntFamily(d.gx, d.gy, weekIndex(Date.now())) === habIdx;
-  return { legendary: false, wanderedFrom: from, species: PACK.speciesById.get(m.id), level, shiny: Math.floor(r() * (hunt ? POST.HUNT_ODDS : SHINY.ODDS)) === 0, seed: hash32(d.rx, d.ry, seed | 0), hunt };
+  const spc = PACK.speciesById.get(m.id);
+  const gene = (spc && spc.hasGene && r() < VARIANT.CHANCE) ? regionVariant(spc, d.gx, d.gy) : 0;
+  return { legendary: false, wanderedFrom: from, gene, species: spc, level, shiny: Math.floor(r() * (hunt ? POST.HUNT_ODDS : SHINY.ODDS)) === 0, seed: hash32(d.rx, d.ry, seed | 0), hunt };
 }
 
 // ===== Catch model =====
@@ -896,7 +899,7 @@ function recordGymWin(save, g) { // returns true if a new badge was earned
 function recordChampion(save, g) { const k = regionKey(g.gx, g.gy); const r = save.badges[k] || (save.badges[k] = { gyms: {}, champion: 0, region: regionName(g.gx, g.gy) }); r.champion = (r.champion || 0) + 1; r.title = { holder: 'you', usurper: null, epoch: (r.title && r.title.epoch) || 0, former: (r.title && r.title.former) || null }; return r.champion === 1; }
 function teamLevel(save) { if (!save.team.length) return 5; return Math.round(save.team.reduce((a, m) => a + m.level, 0) / save.team.length); }
 function makeMonster(save, enc, where) {
-  const tr = creatureTraits(save.nextUid, enc.species);
+  const tr = creatureTraits(save.nextUid, enc.species, enc.gx, enc.gy);
   const m = { uid: save.nextUid++, speciesId: enc.species.id, level: enc.level, shiny: !!enc.shiny, legendary: !!enc.legendary, caughtAt: where || null, xp: 0, hp: null, moves: null, gender: enc.gender != null ? enc.gender : tr.gender, gene: enc.gene != null ? enc.gene : tr.gene, walkM: 0 };
   hydrate(m); m.hp = m.maxHp; return m;
 }
@@ -934,6 +937,22 @@ function baseProfile(sp) {
 }
 const PROFILE_CLAMP = [0.35, 2.5];
 function shapeBy(profile, key, core) { if (!profile) return core; const mean = (profile.hp + profile.atk + profile.def + profile.spa + profile.spd + profile.spe) / 6; const r = Math.max(PROFILE_CLAMP[0], Math.min(PROFILE_CLAMP[1], profile[key] / mean)); return Math.max(1, Math.round(core * r)); }
+// A pack can give a variant its own types and art but rarely its own stats, so a variant redistributes
+// what the species already has: two stats up, two down, by a fixed amount, chosen from the species and
+// the variant. The total is unchanged, so an Alolan line is different to use without being stronger.
+const VARIANT_SHIFT = 0.12;
+const STAT_KEYS = ['hp', 'atk', 'def', 'spa', 'spd', 'spe'];
+function variantStats(sp, gene, st) {
+  if (!gene || !st) return st;
+  const r = rng(hash32(strHash(sp.id), gene, 4601));
+  const keys = STAT_KEYS.slice(); for (let i = keys.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [keys[i], keys[j]] = [keys[j], keys[i]]; }
+  const out = { ...st };
+  out[keys[0]] = Math.max(1, Math.round(st[keys[0]] * (1 + VARIANT_SHIFT)));
+  out[keys[1]] = Math.max(1, Math.round(st[keys[1]] * (1 + VARIANT_SHIFT / 2)));
+  out[keys[2]] = Math.max(1, Math.round(st[keys[2]] * (1 - VARIANT_SHIFT)));
+  out[keys[3]] = Math.max(1, Math.round(st[keys[3]] * (1 - VARIANT_SHIFT / 2)));
+  return out;
+}
 function statsFor(sp, level) {
   if (PACK.mode === 'full' && sp.stats) {
     const b = sp.stats;
@@ -951,7 +970,7 @@ function movesAtLevel(sp, level) {
 }
 function hydrate(m) {
   const sp = speciesView(m) || PACK.speciesById.get(m.speciesId); if (!sp) return m;
-  const st = statsFor(sp, m.level);
+  const st = variantStats(PACK.speciesById.get(m.speciesId) || sp, m.gene || 0, statsFor(sp, m.level));
   m.maxHp = st.hp;
   if (m.hp == null || m.hp > m.maxHp) m.hp = m.maxHp;
   if (PACK.mode === 'full') {
@@ -1121,7 +1140,7 @@ function battleRoundLight(pl, en, action, rand) {
   pl.ref.hp = pl.hp; en.ref && (en.ref.hp = en.hp);
   return { log, playerDown: pl.hp <= 0, enemyDown: en.hp <= 0, windup: !!en.windup, usedOnce: !!pl.usedOnce, enemyUsedOnce: !!en.usedOnce };
 }
-function wildInstance(enc) { const tr = creatureTraits(enc.seed || 0, enc.species); const m = { uid: 0, speciesId: enc.species.id, level: enc.level, shiny: !!enc.shiny, legendary: !!enc.legendary, xp: 0, hp: null, moves: null, gender: tr.gender, gene: tr.gene }; hydrate(m); return m; }
+function wildInstance(enc) { const tr = creatureTraits(enc.seed || 0, enc.species); const m = { uid: 0, speciesId: enc.species.id, level: enc.level, shiny: !!enc.shiny, legendary: !!enc.legendary, xp: 0, hp: null, moves: null, gender: tr.gender, gene: enc.gene != null ? enc.gene : tr.gene }; hydrate(m); return m; }
 // Nobody should be stuck: if the whole team is out and you cannot afford a heal, resting is free once a day.
 const FREE_RESTS_PER_DAY = 5;
 function freeRestsLeft(save) { const d = dayIndex(Date.now()); const r = save.freeRest || {}; return r.day === d ? Math.max(0, FREE_RESTS_PER_DAY - (r.used || 0)) : FREE_RESTS_PER_DAY; }
@@ -1901,7 +1920,30 @@ function evolveNow(save, m, toId) {
   save.seen[next.id] = true; (save.dexCaught || (save.dexCaught = [])).includes(next.id) || save.dexCaught.push(next.id);
   return { from, to: next.id };
 }
-function creatureTraits(seed, sp) { const r = rng(hash32(seed | 0, strHash(sp.id), 2401)); return { gender: r() < 0.5 ? 0 : 1, gene: sp.hasGene && r() < 0.15 ? 1 : 0 }; }
+// Regional variants. A pack marks them as extra forms gated on `gene`: 0 is the ordinary creature,
+// 1 and up are the region-specific ones, each with its own types, sprite and stats.
+// Which variant a region favours is fixed for that region (and world), so a species looks one way in one
+// region and another way across the map. Meeting one is uncommon but nothing like a shiny.
+const VARIANT = { CHANCE: 0.12 };
+function geneCount(sp) {   // how many variants this species has, counting the ordinary form as 0
+  let max = 0; (sp.forms || []).forEach(f => { const c = f.conditions; const arr = Array.isArray(c) ? c : [c || {}]; arr.forEach(cc => { if (typeof cc.gene === 'number' && cc.gene > max) max = cc.gene; }); });
+  return max;
+}
+function regionVariant(sp, gx, gy) {   // which variant this region favours: 0 when the species has none
+  const n = geneCount(sp); if (!n) return 0;
+  return 1 + (hash32(gx, gy, strHash(sp.id), 4501) % n);
+}
+function variantName(sp, gene) {
+  if (!gene) return sp.name;
+  const f = (sp.forms || []).find(x => { const c = x.conditions; const arr = Array.isArray(c) ? c : [c || {}]; return arr.some(cc => cc.gene === gene); });
+  return f ? (f.fullName || f.name || sp.name) : sp.name;
+}
+function creatureTraits(seed, sp, gx, gy) {
+  const r = rng(hash32(seed | 0, strHash(sp.id), 2401));
+  const gender = r() < 0.5 ? 0 : 1;
+  if (!sp.hasGene || gx == null) return { gender, gene: sp.hasGene && r() < VARIANT.CHANCE ? 1 : 0 };
+  return { gender, gene: r() < VARIANT.CHANCE ? regionVariant(sp, gx, gy) : 0 };
+}
 function holdItem(save, m, itemId) { if (!PACK.items.has(itemId) || (save.items[itemId] || 0) < 1) return false; if (m.held) addItem(save, m.held); removeItem(save, itemId); m.held = itemId; return true; }
 function unholdItem(save, m) { if (!m.held) return false; addItem(save, m.held); delete m.held; return true; }
 
@@ -3214,8 +3256,12 @@ document.getElementById('guideBtn').addEventListener('click', () => { const d = 
 
 
 // ----- what's new: shown once when the version changes -----
-const APP_VERSION = '83';
+const APP_VERSION = '86';
 const WHATS_NEW = {
+  '86': ['Fixed a bad one: the Team panel stopped drawing partway through, so the region list and recent history looked empty and items looked missing. Nothing was ever lost, and it all comes back with this update.',
+    'A section that fails now fails alone and says your save is intact, instead of blanking the rest of the panel.'],
+  '85': ['Battle at the leader\'s level now covers every serious fight in any region: gyms, the League, title defences, rematches, tournaments, Champion\'s Road, your rival, the evil team from grunt to boss, the legend gauntlet and other players\' teams. Wild creatures, route trainers and legends themselves are untouched.'],
+  '84': ['Regional forms: some species grow differently depending on the region, with their own typing, artwork and stat spread. Which form a region grows is fixed for that region, so trading and travelling are how you collect them all. About one encounter in eight of a species that has them.'],
   '83': ['Corrected: ordinary shiny odds are 1 in 512 on scans and eggs, not 1 in 128. The week\'s hunt family is still 1 in 64.',
     'Legends keep the better odds: 1 in 128, and 1 in 64 for the legend a region is watching that week.'],
   '82': ['Shiny odds on scans and eggs are now 1 in 512, and the week\'s hunt family stays at 1 in 64.',
@@ -3413,7 +3459,10 @@ function playCue(name) { try { const b64 = PACK.sounds && PACK.sounds.get(name);
 function flash(msg, ms = 4000) { const f = document.getElementById('flash'); f.textContent = msg; f.classList.add('show'); clearTimeout(f._h); f._h = setTimeout(() => f.classList.remove('show'), ms); }
 function hpBar(m) { const f = m.maxHp ? m.hp / m.maxHp : 1; return '<div class="hpb"><div class="hpf" style="width:' + Math.round(f * 100) + '%;background:' + (f > 0.5 ? '#3f9a6a' : f > 0.2 ? '#d8a63a' : '#d8503a') + '"></div></div><small>' + m.hp + '/' + m.maxHp + '</small>'; }
 function startBattle(kind, foes, meta, headline) {
-  if (['gym', 'league', 'master', 'champdef', 'tourney', 'road'].includes(kind) && HANDICAP.OFFSET != null) { const top = Math.max(...foes.map(f => f.level)); const cap = Math.max(1, top + HANDICAP.OFFSET); const n = applyLevelCap(state.save, cap); if (n) headline = 'Your team fights at Lv ' + cap + ' here. ' + headline; }
+  // Every fight that is meant to be a test, in any region: gyms, the League, title defences, rematches,
+  // tournaments, Champion's Road, the rival, the evil team from grunt to boss, the legend gauntlet, and
+  // another player's team. Wild creatures, route trainers and a legend itself are left alone.
+  if (CAPPED_BATTLES.has(kind) && HANDICAP.OFFSET != null) { const top = Math.max(...foes.map(f => f.level)); const cap = Math.max(1, top + HANDICAP.OFFSET); const n = applyLevelCap(state.save, cap); if (n) headline = 'Your team fights at Lv ' + cap + ' here. ' + headline; }
   state.battle = { kind, foes, foeIdx: 0, meta, active: firstAble(state.save), log: [], windup: false, counter: false, xpTotal: 0 };
   document.getElementById('gpsBig').classList.remove('show');
   renderBattle(headline);
@@ -3695,6 +3744,14 @@ function openLandmarkShop(lm) {
   };
   draw(); t.classList.add('show');
 }
+// One failing line used to take the whole panel with it: the region list and history simply vanished,
+// which looked exactly like lost data. Sections now fail alone and say so.
+function guardSection(name, fn) {
+  try { fn(); } catch (e) {
+    console.error('section failed:', name, e);
+    try { const el = document.getElementById('panelBody') || document.getElementById('pMain'); if (el) { const w = document.createElement('div'); w.className = 'meta'; w.style.color = 'var(--warn)'; w.textContent = 'The ' + name + ' section could not be drawn. Nothing is lost: your save is intact. Please tell Casim what you were doing.'; el.appendChild(w); } } catch (x) {}
+  }
+}
 function renderTeam() {
   if (!state.save) return;
   document.getElementById('team').textContent = 'Team ' + state.save.team.length;
@@ -3708,7 +3765,7 @@ function renderTeam() {
     qs.forEach(q => { const el = document.createElement('div'); el.className = 'mon'; el.innerHTML = '<span class="nm">' + q.text + '<br><small>' + Math.min(q.prog, q.target).toFixed(q.id === 'walk' ? 1 : 0) + ' of ' + q.target + (q.claimed ? ', claimed' : q.done ? ', done' : '') + '</small></span>'; if (q.done && !q.claimed) { const b = document.createElement('button'); b.textContent = 'Claim ' + POST.QUEST_COINS; b.addEventListener('click', () => { if (questClaim(state.save, day, q.id)) { persistSave(); renderTeam(); flash('+' + POST.QUEST_COINS + ' ' + COIN.NAME); } }); el.appendChild(b); } pq.appendChild(el); });
     const d0 = describe(state.lat, state.lon); const hf = PACK.habitats[huntFamily(d0.gx, d0.gy, weekIndex(Date.now()))]; const rv = state.save.rival ? rivalOf(state.save) : null;
     const pch = photoChallengeDone(state.save, d0.gx, d0.gy, weekIndex(Date.now())) ? null : photoChallenge(d0.gx, d0.gy, weekIndex(Date.now()));
-    const n = document.createElement('div'); n.className = 'meta'; n.innerHTML = (pch ? 'Photo challenge this week in ' + d0.region + ': <b>' + pch.text + '</b>, 60 ' + COIN.NAME + '. ' : 'Photo challenge done this week. ') + 'Shiny hunt this week in ' + d0.region + ': <b>' + hf.name + '</b>, 1 in ' + POST.HUNT_ODDS + ' on those routes.' + (() => { const lg = regionLegends(d0.gx, d0.gy, seasonOf(Date.now())); if (!lg.length) return ''; const w = lg[watchedLegend(d0.gx, d0.gy, weekIndex(Date.now())) % lg.length]; const sp = PACK.speciesById.get(w.speciesId); return sp ? ' Watched legend: <b>' + esc(sp.name) + '</b>, 1 in ' + LEGEND_SHINY.WATCHED + ' on the day it appears.' : ''; })() + (rv ? ' Rival ' + rv.name + ': ' + rv.record.wins + ' wins, ' + rv.record.losses + ' losses.' : ''); pq.appendChild(n); }
+    const n = document.createElement('div'); n.className = 'meta'; n.innerHTML = (pch ? 'Photo challenge this week in ' + d0.region + ': <b>' + pch.text + '</b>, 60 ' + COIN.NAME + '. ' : 'Photo challenge done this week. ') + 'Shiny hunt this week in ' + d0.region + ': <b>' + hf.name + '</b>, 1 in ' + POST.HUNT_ODDS + ' on those routes.' + (() => { const lg = regionLegends(d0.gx, d0.gy, seasonOf(Date.now())); if (!lg.length) return ''; const w = lg[watchedLegend(d0.gx, d0.gy, weekIndex(Date.now())) % lg.length]; const sp = PACK.speciesById.get(w.speciesId); return sp ? ' Watched legend: <b>' + esc2(sp.name) + '</b>, 1 in ' + LEGEND_SHINY.WATCHED + ' on the day it appears.' : ''; })() + (rv ? ' Rival ' + rv.name + ': ' + rv.record.wins + ' wins, ' + rv.record.losses + ' losses.' : ''); pq.appendChild(n); }
   { const pw = document.getElementById('pWeek'); const since = Date.now() - 7 * 86400000; const ev = state.save.history.filter(e => e.t >= since); const n = t => ev.filter(e => e.type === t).length; const regs = new Set(ev.map(e => e.name).filter(Boolean)); const km = (state.save.weekKm || {})[weekIndex(Date.now())] || 0;
     const parts = [];
     if (km) parts.push(km.toFixed(1) + ' km walked');
@@ -4460,6 +4517,7 @@ const GUIDE = [
 <div class="tip">Malls, supermarkets and markets are <b>shops</b>. Visit one, then stand there and tap it to see what it has in: evolution items, stones and TMs from the pack, a few at a time, different at every shop and changed daily. It is the reason to walk to the far side of town.</div>
 <div class="tip">Some landmarks are <b>rest stops</b>. Visit one and it is yours from then on: stand there any time and your team heals to full for nothing. Anywhere that treats or shelters people is always a rest stop, hospitals, clinics, pharmacies, places of worship, libraries, town halls, universities and community centres, and about one landmark in four besides. They show on the map with a green ring once you have found them.</div>
 <p>About one scan in twenty meets a creature from the route next door, and the battle line says which way it came. Two settings change what lives where: <b>Wanderers</b> turns those visitors off, and <b>Migration</b>, off by default, moves every family between routes each month or week, so ground you know holds something new next season. Nothing you have already caught is affected.</p>
+<p>Some creatures have <b>regional forms</b>: the same species with different typing, different artwork and a different spread of stats. Which form a region grows is fixed for that region, so a Meowth caught on one side of the map may be a Dark type and one caught in the next region a Steel type. They turn up in about one encounter in eight of a species that has them, which makes them uncommon rather than rare. A form's stats are the species' own, redistributed: different to use, not stronger.</p>
 <div class="tip">Shinies appear about once in 1,024 scans, eggs and legends and use their own artwork. Each week every region names one <b>shiny hunt</b> family with odds of 1 in 64 on its routes.</div>
 <p>Caught creatures join your team of six, or the box when the team is full. Each has a personality, a gender, and sometimes a regional variant. They gain XP from battles and evolve by the pack's own rules: level, an item, distance walked with you, time of day, and others. Nickname or pin one in the Team panel. A pinned creature cannot be boxed or traded by accident.</p>` },
   { id: 'battle', title: 'Battles and moves', html: () => `<h3>Choosing a move</h3>
@@ -4467,7 +4525,8 @@ const GUIDE = [
 <p>Type advantage applies to every strike, yours and the foe's. Choosing the strike that is super effective against the foe usually decides close fights.</p>
 <div class="tip">When a foe <b>winds up</b>, choose <b>Guard</b>. The incoming hit is cut to a quarter and your next strike counters for double damage. Ignoring wind-ups is the main way a fight at your level is lost.</div>
 <p>Stats follow each species, so a Shuckle takes hits well and barely deals any. A held Plate boosts one type of strike, and a held Mega Stone makes its holder Mega Evolve for the length of a battle. The <b>Auto</b> button plays route trainers for you.</p>
-<p>In the menu, <b>Battle at the leader's level</b> caps your own creatures for gym and League battles to the leader's level, or a few below. Their stats scale down for the fight, XP still goes to their real level, and everything returns to normal afterwards. It is the way to keep gyms interesting once your team has outgrown a region.</p>` },
+<p>In the menu, <b>Battle at the leader's level</b> caps your own creatures to the strongest opponent's level, or a few below, in every battle that is meant to be a test: gyms, the League, title defences, master rematches, tournaments, Champion's Road, your rival, the evil team from grunt to boss, the legend gauntlet, and another player's team. Wild creatures, route trainers and legends themselves are left alone.</p>
+<p>Their stats scale down for the fight, XP still goes to their real level, and everything returns to normal afterwards. It is what keeps an old region worth walking into once your team has outgrown it.</p>` },
   { id: 'gyms', title: 'Gyms, badges and the League', html: () => `<h3>Earning badges</h3>
 <p>Each region has eight gyms of eight different types, one in each domain, and a League. Leaders grow with every badge you hold anywhere, and their teams grow from two creatures to five. Each region sets its own starting level, so a new region is its own measure of you. Nobody will tell you a leader's level before you reach the gym.</p>
 <p>Each leader has an <b>ace</b> that evolves as the leader grows. After you beat a leader for the first time you may choose which of their creatures becomes that ace and give it a nickname. It stays with them from then on. The region's Gyms tab keeps every team you have beaten, with the leader's level at the time.</p>
