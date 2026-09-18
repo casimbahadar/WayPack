@@ -12,7 +12,13 @@ const [dir, ...rest] = process.argv.slice(2);
 if (!dir) { console.error('usage: node pack-build.mjs <packdir> --name "Pack name" [--author A] [--version V]'); process.exit(2); }
 const opt = {}; for (let i = 0; i < rest.length; i += 2) opt[rest[i].replace(/^--/, '')] = rest[i + 1];
 
-const html = readFileSync(new URL('./scouter-world-v39.html', import.meta.url), 'utf8');
+// Validate against whichever build sits beside this script, so the builder never drifts from the game.
+const here = new URL('./', import.meta.url);
+const build = (process.env.WAYPACK_HTML && [process.env.WAYPACK_HTML])
+  || readdirSync(here).filter(f => /^(index|scouter-world-v\d+)\.html$/.test(f))
+       .sort((a, b) => (+(b.match(/\d+/) || [0])[0]) - (+(a.match(/\d+/) || [0])[0]));
+if (!build.length) { console.error('no index.html or scouter-world-vNN.html beside this script to validate against'); process.exit(2); }
+const html = readFileSync(new URL('./' + build[0], import.meta.url), 'utf8');
 const CORE = html.match(/\/\* CORE-START \*\/([\s\S]*?)\/\* CORE-END \*\//)[1];
 const ctx = { Math, console }; vm.createContext(ctx);
 vm.runInContext(CORE + '\nglobalThis.validatePack = validatePack;', ctx);

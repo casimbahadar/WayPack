@@ -1,0 +1,236 @@
+{
+ "format": "scouter-pack/1",
+ "name": "Starter Kit",
+ "author": "you",
+ "version": "1",
+ "families": [
+  {
+   "id": "emberfen",
+   "name": "Emberfen",
+   "color": "#e07a2f"
+  },
+  {
+   "id": "tidewrack",
+   "name": "Tidewrack",
+   "color": "#4f93b0"
+  },
+  {
+   "id": "bramblehost",
+   "name": "Bramblehost",
+   "color": "#4fb07a"
+  },
+  {
+   "id": "cinderwing",
+   "name": "Cinderwing",
+   "color": "#d4453a"
+  },
+  {
+   "id": "stonekeeper",
+   "name": "Stonekeeper",
+   "color": "#9b8f7a"
+  },
+  {
+   "id": "glimmermoth",
+   "name": "Glimmermoth",
+   "color": "#c77fe8"
+  },
+  {
+   "id": "frostpeat",
+   "name": "Frostpeat",
+   "color": "#7fb6d4"
+  },
+  {
+   "id": "gustling",
+   "name": "Gustling",
+   "color": "#cfd8c9"
+  }
+ ],
+ "species": [
+  {
+   "id": "ember01",
+   "name": "Fennik",
+   "family": "emberfen",
+   "stage": 1,
+   "evolvesTo": [
+    "ember02"
+   ],
+   "evolveLevel": 16,
+   "sprite": "ember01.png",
+   "legendary": false
+  },
+  {
+   "id": "ember02",
+   "name": "Fenhound",
+   "family": "emberfen",
+   "stage": 2,
+   "evolvesTo": [
+    "ember03"
+   ],
+   "evolveLevel": 34,
+   "sprite": "ember02.png",
+   "legendary": false
+  },
+  {
+   "id": "ember03",
+   "name": "Fenwarden",
+   "family": "emberfen",
+   "stage": 3,
+   "evolvesTo": [],
+   "evolveLevel": null,
+   "sprite": "ember03.png",
+   "legendary": false
+  },
+  {
+   "id": "tide01",
+   "name": "Rillet",
+   "family": "tidewrack",
+   "stage": 1,
+   "evolvesTo": [
+    "tide02"
+   ],
+   "evolveLevel": 18,
+   "sprite": "tide01.png",
+   "legendary": false
+  },
+  {
+   "id": "tide02",
+   "name": "Wrackfin",
+   "family": "tidewrack",
+   "stage": 2,
+   "evolvesTo": [],
+   "evolveLevel": null,
+   "sprite": "tide02.png",
+   "legendary": false
+  },
+  {
+   "id": "bram01",
+   "name": "Thistlet",
+   "family": "bramblehost",
+   "stage": 1,
+   "evolvesTo": [
+    "bram02"
+   ],
+   "evolveLevel": 17,
+   "sprite": "bram01.png",
+   "legendary": false
+  },
+  {
+   "id": "bram02",
+   "name": "Bramblehost",
+   "family": "bramblehost",
+   "stage": 2,
+   "evolvesTo": [],
+   "evolveLevel": null,
+   "sprite": "bram02.png",
+   "legendary": false
+  },
+  {
+   "id": "cind01",
+   "name": "Sparkmoth",
+   "family": "cinderwing",
+   "stage": 1,
+   "evolvesTo": [
+    "cind02"
+   ],
+   "evolveLevel": 20,
+   "sprite": "cind01.png",
+   "legendary": false
+  },
+  {
+   "id": "cind02",
+   "name": "Cinderwing",
+   "family": "cinderwing",
+   "stage": 2,
+   "evolvesTo": [],
+   "evolveLevel": null,
+   "sprite": "cind02.png",
+   "legendary": false
+  },
+  {
+   "id": "stone01",
+   "name": "Pebblet",
+   "family": "stonekeeper",
+   "stage": 1,
+   "evolvesTo": [
+    "stone02"
+   ],
+   "evolveLevel": 22,
+   "sprite": "stone01.png",
+   "legendary": false
+  },
+  {
+   "id": "stone02",
+   "name": "Stonekeeper",
+   "family": "stonekeeper",
+   "stage": 2,
+   "evolvesTo": [],
+   "evolveLevel": null,
+   "sprite": "stone02.png",
+   "legendary": false
+  },
+  {
+   "id": "glim01",
+   "name": "Glimmerling",
+   "family": "glimmermoth",
+   "stage": 1,
+   "evolvesTo": [],
+   "evolveLevel": null,
+   "sprite": "glim01.png",
+   "legendary": false
+  },
+  {
+   "id": "warden",
+   "name": "The Quiet Warden",
+   "family": "stonekeeper",
+   "stage": 3,
+   "evolvesTo": [],
+   "evolveLevel": null,
+   "sprite": "warden.png",
+   "legendary": true
+  },
+  {
+   "id": "frost01",
+   "name": "Rimelet",
+   "family": "frostpeat",
+   "stage": 1,
+   "evolvesTo": [
+    "frost02"
+   ],
+   "evolveLevel": 19,
+   "sprite": "frost01.png",
+   "legendary": false
+  },
+  {
+   "id": "frost02",
+   "name": "Frostpeat",
+   "family": "frostpeat",
+   "stage": 2,
+   "evolvesTo": [],
+   "evolveLevel": null,
+   "sprite": "frost02.png",
+   "legendary": false
+  },
+  {
+   "id": "gust01",
+   "name": "Gustling",
+   "family": "gustling",
+   "stage": 1,
+   "evolvesTo": [
+    "gust02"
+   ],
+   "evolveLevel": 21,
+   "sprite": "gust01.png",
+   "legendary": false
+  },
+  {
+   "id": "gust02",
+   "name": "Galewisp",
+   "family": "gustling",
+   "stage": 2,
+   "evolvesTo": [],
+   "evolveLevel": null,
+   "sprite": "gust02.png",
+   "legendary": false
+  }
+ ]
+}
