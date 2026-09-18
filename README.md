@@ -8,32 +8,38 @@ It is one HTML file. No build step, no install, no account.
 
 ## What is in it
 
-- **The world from the map.** Routes, domains and regions are derived from coordinates, so the same square is the same route every time you stand on it. Named landmarks come from OpenStreetMap, and where a region is thin on them the search widens to everyday places so there is always somewhere to walk to.
-- **Gyms, badges and a League** in every region, with leaders who grow as you do, an ace you choose after your first win, title defences, master rematches, tournaments and Champion's Road.
-- **Directions to anywhere:** an address, a place name, coordinates, or the gyms, League, legend, landmarks, pins and friends' regions the game already knows. Walking, cycling and driving each use their own router, with distance, duration, arrival clock, spoken turns and an arrow on the screen edge when the destination is beyond it.
-- **Rest stops and shops.** Hospitals, clinics, libraries, places of worship and a quarter of other landmarks heal your team for nothing once you have found them. Malls, supermarkets and markets stock evolution items, stones and TMs, different at every shop and changed daily.
-- **Six playthroughs per pack.** Each region layout and route size is its own team, box, badges and history on the same streets, sharing only the coin purse. Cloud saves cover all six.
-- **Evolution on your terms.** Leave it automatic, or be asked after the battle and evolve when you choose.
-- **A world of your own, or the shared one.** The shared world is the same for everybody. Take a world of your own and the families, gym types, leaders, region names and evil teams all change on the same streets, so a creature you cannot find may be common on a friend's routes. Worlds have six-character codes, so friends can play yours, and each world keeps its own regions, badges and titles: moving between them parks your work rather than losing it. Your creatures, coins, items and dex follow you everywhere.
-- **Regions that read as places.** Each one tells you where it came from, how its trainers fight, which gym is worth the walk and what it says about its legend, drawn from over two hundred written lines so no two regions sound alike.
-- **Evil teams** that hold landmarks for a week, with 432 profiles, motives, creeds and bosses. **Legendaries** that appear a route at a time once you are Champion. **Eggs**, **shinies**, a weekly hunt, daily quests and 21 achievements.
-- **Playing with others:** friends by code, ghost teams that walk your routes, trades, egg gifts, live battles by room code, leaderboards, trainer cards with QR codes, and photos with your team, a friend's team, or a creature you just beat.
-- **Spoken route notes and directions**, in whichever of your phone's voices you like, at whatever pitch and speed.
-- **Offline map tiles**, a low-power mode for long walks, and a connection panel that says which services are reachable.
+- **The world from the map.** Routes, domains and regions are derived from coordinates, so the same square is the same route every time you stand on it. Named landmarks come from OpenStreetMap, and where a region is thin on them the search widens so there is always somewhere to walk to.
+- **Gyms, badges and a League** in every region, with leaders who grow as you do, an ace you choose after your first win, title defences, master rematches, tournaments and Champion's Road. Titles are recorded by **season**, so a region can be taken again as the seasons turn.
+- **Battles** where you pick moves, guard, or bring another creature out at the cost of your turn. Experience is paid the moment each opponent falls, to whoever did the work, and you choose whether the rest of the team shares it: not at all, at half, or in full.
+- **Route trainers** with dozens of titles that suit their level, teams of one to four, and creatures drawn from anywhere in the region, so beating one is often how you first meet a family you have not walked to.
+- **Regional forms.** Some species look and fight differently depending on where they live, and a region can also grow a form of its own: typed unlike the original, built differently, and repainted pixel by pixel to suit its typing.
+- **Directions to anywhere:** an address, a place name, coordinates, or the gyms, League, legend, landmarks, pins and friends' regions the game already knows. Walking, cycling and driving each use their own router, with spoken turns, an arrow at the screen edge, and a choice between the quickest and the shortest route. Live traffic is available if you supply a key for it.
+- **Rest stops and shops.** Hospitals, libraries, places of worship and a quarter of other landmarks heal your team for nothing once found. Malls, supermarkets and markets stock evolution items, stones and TMs, different at every shop and changed daily.
+- **Six playthroughs per pack**, each its own team, box, badges and history on the same streets, sharing only the coin purse. Cloud saves cover all six.
+- **A world of your own, or the shared one.** Take your own and the families, gym types, leaders, region names and evil teams all change on the same streets. Worlds have six-character codes, so friends can play yours, and every world keeps its own regions, badges and titles.
+- **Evil teams** that hold landmarks for a week, **legendaries** that appear a route at a time once you are Champion, **eggs**, **shinies**, a weekly hunt, daily quests and 21 achievements.
+- **Playing with others:** friends by code, ghost teams that walk your routes, trades, egg gifts, live battles by room code, **async duels** with a stake of coins, leaderboards, trainer cards, and photos with your team or a friend's.
+- **Things to find your way back to:** the last twenty places you scanned with what appeared there, a box you can split into named groups, pins you can travel to, and a week you can share as a picture.
 
 ## Packs
 
-All creatures, types, items and art come from a **pack**. Two formats load: a GMS `.bin` file, or a `scouter-pack/1` folder. Nothing about the game assumes any particular pack. It reads families, types, gyms, moves, items and images from what you give it, and names in the game follow the pack's own words. Each pack keeps its own six playthroughs.
+All creatures, types, items and art come from a **pack**. Two formats load: a GMS `.bin` file, or a `scouter-pack/1` folder. Nothing about the game assumes any particular pack, and names in the game follow the pack's own words.
 
-`pokeapi-to-pack.mjs` and `pack-build.mjs` build packs, and `PACK-FORMAT.md` documents the format.
+Making one is documented properly now. **[PACK-AUTHORING.md](PACK-AUTHORING.md)** walks from an empty folder to something you can walk around in, `pack-starter/` is a working eight-family pack you can edit rather than starting blank, `make-placeholder-sprites.mjs` draws stand-in art so a pack can be played before anything is drawn, `pack-build.mjs` builds it, and `pack-check.mjs` reports what a validator cannot see. [PACK-FORMAT.md](PACK-FORMAT.md) is the field-by-field reference.
+
+## Trading, and why your copy stays yours
+
+Every trade and duel carries a fingerprint of the pack's data: ids, names, typing, stats, evolutions and forms. Two players can only trade if their packs match exactly, and a creature that does arrive is rebuilt from your own pack rather than from what was sent. Change your copy however you like, and those changes stay in it.
 
 ## Privacy
 
-Online play is opt-in and needs no email or password. You pick a name and get a friend code. A friend code lets someone see which region you are in, never where you are in it. Your pins and photos never leave the phone. Coordinates are never stored on the server. Data sits behind row-level security with no direct access, and the only door is a fixed set of server functions keyed by your own token. A second phone can take over the same trainer with a one-time link code, since a friend code alone must never hand over an account, and a cloud save never silently overwrites a newer copy from another device. Delete my online data, in the Online sheet, removes everything about you from the server.
+Online play is opt-in and needs no email or password. You pick a name and get a friend code, which lets someone see which region you are in, never where you are in it. Your pins, notes and photos never leave the phone. Coordinates are never stored on the server. Data sits behind row-level security with no direct access, and the only door is a fixed set of server functions keyed by your own token. A second phone takes over the same trainer with a one-time link code, and a cloud save never silently overwrites a newer copy.
 
-**Hosting.** Cloud saves are almost all of the running cost, so the Server setting lets you put yours on a server of your own while friends, ghosts, trades and leaderboards stay on the shared one, which leaves online play untouched. You can also run everything on your own server, with the honest consequence that only people using it can see you. Any server answering PostgREST-style calls at `/rest/v1/rpc/…` with the WayPack functions works. Supabase, hosted or on your own machine, is the easiest. The schema is in this repository.
+**Hosting.** Cloud saves are almost all of the running cost, so the Server setting lets you put yours on a server of your own while friends, ghosts, trades and leaderboards stay on the shared one, which leaves online play untouched. You can also run everything on your own server. Any server answering PostgREST-style calls with the WayPack functions works.
 
-Details are in [WAYPACK.md](WAYPACK.md).
+**Supporters.** The game is free and stays free. Anyone who chips in towards the server can have individual extras switched on against their trainer name and friend code: no tiers, no bundles. Anything found with the Shiny Charm is marked and can never be traded, which is what keeps a paid advantage inside the payer's own game. See [SUPPORTERS.md](SUPPORTERS.md).
+
+Details of everything are in [WAYPACK.md](WAYPACK.md).
 
 ## Repository layout
 
@@ -43,9 +49,12 @@ forge-engine.js          the music engine (Musical Forge Studio, MIT)
 waypack.tests.mjs        engine harness: node waypack.tests.mjs
 waypack-sweep.cjs        end-to-end browser sweep (Playwright + a local server)
 WAYPACK.md               how everything works, and why
+PACK-AUTHORING.md        making a pack from nothing
 PACK-FORMAT.md           the pack format
+SUPPORTERS.md            switching extras on for a supporter
 EVIL-TEAMS.md            the evil-team generator
 SHIP-ANDROID.md          building the Android app
+pack-starter/            a working pack to start from
 waypack-android/         the Capacitor project
 ```
 
@@ -55,15 +64,15 @@ waypack-android/         the Capacitor project
 node waypack.tests.mjs
 ```
 
-It extracts the engine from the shipped HTML and runs 427 checks against it, including the real pack when `poke9_data_v1_6_gmsdp2.bin` is present. Every rule in the game has a check, and balance claims are measured rather than asserted.
+It extracts the engine from the shipped HTML and runs 588 checks against it, including the real pack when one is present. Every rule in the game has a check, and balance claims are measured rather than asserted.
 
-`waypack-sweep.cjs` is the other half: it drives the whole app in a headless browser (battles, catching, every panel and tab, directions, slot switching, export and import, reset, reload) and fails on any JavaScript or console error. It has found real bugs on its first run more than once. Serve the folder and run it with Playwright installed.
+`waypack-sweep.cjs` is the other half: it drives the whole app in a headless browser, 24 steps covering battles, catching, every panel and tab, directions, slot switching, export and import, reset and reload, and fails on any JavaScript or console error. It has caught real bugs on its first run more than once, including one the same week this was written.
 
-Both run against a headless browser with the network mocked. Real GPS, the live routing and landmark services, a real camera and two phones meeting over the backend are only ever proven on a phone.
+Both run with the network mocked. Real GPS, the live routing and landmark services, a real camera and two phones meeting over the backend are only ever proven on a phone.
 
 ## Android app (optional)
 
-`waypack-android/` wraps the same file with Capacitor for background walking with the screen off, which a web page cannot do. `SHIP-ANDROID.md` covers building it. The browser version is unaffected by any of it.
+`waypack-android/` wraps the same file with Capacitor for background walking with the screen off, which a web page cannot do. `SHIP-ANDROID.md` covers building it.
 
 ## Credits
 

@@ -1,11 +1,20 @@
 const { chromium } = require(process.env.PW);
+// click a battle action by matching its label, looked up fresh inside the page each time
+async function tapAction(p, re) {
+  return await p.evaluate(src => {
+    const rx = new RegExp(src);
+    const b = [...document.querySelectorAll('#tActs button')].find(x => rx.test(x.textContent) && !x.disabled);
+    if (!b) return false; b.click(); return true;
+  }, re.source);
+}
+
 const problems = [], steps = [];
 (async () => {
   const b = await chromium.launch(); const c = await b.newContext({ viewport: { width: 390, height: 844 } }); const p = await c.newPage();
   p.on('pageerror', e => problems.push('JS ERROR: ' + e.message));
   p.on('console', m => { if (m.type() === 'error' && !/net::|ERR_|Failed to load|favicon/.test(m.text())) problems.push('CONSOLE: ' + m.text().slice(0, 120)); });
   p.on('dialog', d => d.accept());
-  await p.addInitScript(() => { try { localStorage.setItem('scouter-intro','1'); localStorage.setItem('scouter-version','74'); localStorage.setItem('scouter-a2hs','1'); } catch(e){}
+  await p.addInitScript(() => { try { localStorage.setItem('scouter-intro','1'); localStorage.setItem('scouter-version','107'); localStorage.setItem('scouter-a2hs','1'); } catch(e){}
     window.__said = []; try { Object.defineProperty(window, 'speechSynthesis', { configurable: true, get: () => ({ speak: u => window.__said.push(u.text), cancel: () => {} }) }); } catch (e) {}
     window.SpeechSynthesisUtterance = function (t) { this.text = t; };
     try { Object.defineProperty(navigator, 'wakeLock', { configurable: true, get: () => ({ request: async () => ({ release: async () => {}, addEventListener: () => {} }) }) }); } catch (e) {} });
@@ -20,20 +29,20 @@ const problems = [], steps = [];
     r.fulfill({ status:200, contentType:'application/json', body: JSON.stringify(R === undefined ? true : R) }); });
   const step = async (name, fn) => { const before = problems.length; try { await fn(); } catch (e) { problems.push('STEP FAILED (' + name + '): ' + e.message.split('\n')[0].slice(0, 110)); } steps.push(name + (problems.length > before ? '  ← problem' : '')); };
 
-  await p.goto('http://localhost:8765/v74-localleaflet.html'); await p.waitForTimeout(1200);
+  await p.goto('http://localhost:8765/v107-localleaflet.html'); await p.waitForTimeout(1200);
   await step('load pack', async () => { await p.setInputFiles('#packBin', 'pack.bin'); await p.waitForFunction(() => document.querySelectorAll('#tActs button').length > 0, null, { timeout: 40000 }); });
   await step('pick starter', async () => { await p.click('#tActs button'); await p.waitForTimeout(900); await p.evaluate(() => document.getElementById('toast').classList.remove('show')); await p.evaluate(() => setSim(true)); });
   await step('scan and battle a wild to the end', async () => { await p.click('#scan'); await p.waitForTimeout(500);
-    for (let i = 0; i < 60; i++) { const btns = await p.$$('#tActs button'); if (!btns.length) break; const labels = await Promise.all(btns.map(x => x.textContent())); const idx = labels.findIndex(l => /Strike|Jab|Blow|Unleash/.test(l)); if (idx < 0) { await btns[0].click(); await p.waitForTimeout(120); break; } await btns[idx].click(); await p.waitForTimeout(90); } });
+    for (let i = 0; i < 60; i++) { const labels = await p.$$eval('#tActs button', bs => bs.map(x => x.textContent)); if (!labels.length) break; const idx = labels.findIndex(l => /Strike|Jab|Blow|Unleash/.test(l)); if (idx < 0) { await p.evaluate(i => { const b = [...document.querySelectorAll('#tActs button')][i]; if (b) b.click(); }, 0); await p.waitForTimeout(120); break; } await p.evaluate(i => { const b = [...document.querySelectorAll('#tActs button')][i]; if (b) b.click(); }, idx); await p.waitForTimeout(90); } });
   await step('scan and throw a catch item', async () => { await p.evaluate(() => document.getElementById('toast').classList.remove('show')); await p.click('#scan'); await p.waitForTimeout(400);
-    for (let i = 0; i < 30; i++) { const btns = await p.$$('#tActs button'); const labels = await Promise.all(btns.map(x => x.textContent())); const j = labels.findIndex(l => /Pok|ball|Throw|I ×/i.test(l)); if (j >= 0) { await btns[j].click(); await p.waitForTimeout(250); break; } const k = labels.findIndex(l => /Strike|Jab/.test(l)); if (k < 0) break; await btns[k].click(); await p.waitForTimeout(90); }
+    for (let i = 0; i < 30; i++) { const labels = await p.$$eval('#tActs button', bs => bs.map(x => x.textContent)); const j = labels.findIndex(l => /Pok|ball|Throw|I ×/i.test(l)); if (j >= 0) { await p.evaluate(i => { const b = [...document.querySelectorAll('#tActs button')][i]; if (b) b.click(); }, j); await p.waitForTimeout(250); break; } const k = labels.findIndex(l => /Strike|Jab/.test(l)); if (k < 0) break; await p.evaluate(i => { const b = [...document.querySelectorAll('#tActs button')][i]; if (b) b.click(); }, k); await p.waitForTimeout(90); }
     await p.evaluate(() => document.getElementById('toast').classList.remove('show')); });
   await step('fight a route trainer', async () => { const chip = await p.$('#trainersBar button'); if (!chip) return; await chip.click(); await p.waitForTimeout(300);
-    for (let i = 0; i < 80; i++) { const btns = await p.$$('#tActs button'); if (!btns.length) break; const labels = await Promise.all(btns.map(x => x.textContent())); const idx = labels.findIndex(l => /Strike|Jab|Blow|Unleash|Guard/.test(l)); if (idx < 0) { await btns[0].click(); break; } await btns[idx].click(); await p.waitForTimeout(80); }
+    for (let i = 0; i < 80; i++) { const labels = await p.$$eval('#tActs button', bs => bs.map(x => x.textContent)); if (!labels.length) break; const idx = labels.findIndex(l => /Strike|Jab|Blow|Unleash|Guard/.test(l)); if (idx < 0) { await p.evaluate(i => { const b = [...document.querySelectorAll('#tActs button')][i]; if (b) b.click(); }, 0); break; } await p.evaluate(i => { const b = [...document.querySelectorAll('#tActs button')][i]; if (b) b.click(); }, idx); await p.waitForTimeout(80); }
     await p.evaluate(() => document.getElementById('toast').classList.remove('show')); });
   await step('walk to a gym and fight the leader', async () => { await p.evaluate(() => { const d = describe(state.lat, state.lon); for (let i = -5; i <= 5; i++) for (let j = -5; j <= 5; j++) { const c = cellCenter(d.rx + i, d.ry + j); const dd = describe(c.lat, c.lon); if (dd.atGym) { moveTo(c.lat, c.lon, false); updateHud(); return; } } });
     await p.waitForTimeout(400); const g = await p.$('#gymBtn'); if (g && await g.isVisible()) { await g.click(); await p.waitForTimeout(300);
-      for (let i = 0; i < 120; i++) { const btns = await p.$$('#tActs button'); if (!btns.length) break; const labels = await Promise.all(btns.map(x => x.textContent())); const idx = labels.findIndex(l => /Strike|Jab|Blow|Unleash|Guard/.test(l)); if (idx < 0) { await btns[0].click(); break; } await btns[idx].click(); await p.waitForTimeout(70); } }
+      for (let i = 0; i < 120; i++) { const labels = await p.$$eval('#tActs button', bs => bs.map(x => x.textContent)); if (!labels.length) break; const idx = labels.findIndex(l => /Strike|Jab|Blow|Unleash|Guard/.test(l)); if (idx < 0) { await p.evaluate(i => { const b = [...document.querySelectorAll('#tActs button')][i]; if (b) b.click(); }, 0); break; } await p.evaluate(i => { const b = [...document.querySelectorAll('#tActs button')][i]; if (b) b.click(); }, idx); await p.waitForTimeout(70); } }
     await p.evaluate(() => document.getElementById('toast').classList.remove('show')); });
   await step('team panel: all four tabs', async () => { await p.click('#team'); await p.waitForTimeout(300); for (const t of ['team','collection','progress','world']) { await p.click('#pTabs button[data-tab=' + t + ']'); await p.waitForTimeout(200); } });
   await step('team row: expand, nickname, pin, reorder, box', async () => { await p.click('#pTabs button[data-tab=team]'); await p.waitForTimeout(200); await p.click('#pTeam .mon .tog'); await p.waitForTimeout(200);
