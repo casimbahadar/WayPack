@@ -2607,7 +2607,19 @@ const POST = { MASTER_LEVEL: 90, ROAD_REGIONS: 3, TOURNEY_SIZE: 8, TOURNEY_STEP:
 const RIVAL_NAMES = ['Ines', 'Kofi', 'Wren', 'Theo', 'Nadia', 'Ezra'];
 function rivalOf(save) { if (!save.rival) { const st = save.team[0] || save.box[0]; const sp = st && PACK.speciesById.get(st.speciesId); save.rival = { name: RIVAL_NAMES[hash32(save.nextUid, strHash(sp ? sp.id : 'x'), 2901) % RIVAL_NAMES.length], starter: sp ? sp.id : null, met: [], record: { wins: 0, losses: 0 } }; } return save.rival; }
 const RIVAL_MILESTONES = [{ id: 'badge1', when: s => badgeCount(s) >= 1, label: 'your first badge' }, { id: 'badge4', when: s => badgeCount(s) >= 4, label: 'four badges' }, { id: 'badge8', when: s => badgeCount(s) >= 8, label: 'eight badges' }, { id: 'champion', when: s => Object.values(s.badges).some(r => r.champion > 0), label: 'the title' }];
-function rivalDue(save) { const rv = rivalOf(save); return RIVAL_MILESTONES.find(m => !rv.met.includes(m.id) && m.when(save)) || null; }
+function rivalDue(save) {
+  const rv = rivalOf(save);
+  // the furthest milestone you have reached and not yet fought; earlier ones you walked past are not owed
+  const reached = RIVAL_MILESTONES.filter(m => !rv.met.includes(m.id) && m.when(save));
+  if (!reached.length) return null;
+  const top = reached[reached.length - 1];
+  if (rv.snoozeDay === dayIndex(Date.now()) && rv.snoozeFor === top.id) return null;   // put off until tomorrow
+  return top;
+}
+function rivalSkipTo(save, milestone) {   // fighting a later milestone settles the earlier ones you walked past
+  const rv = rivalOf(save);
+  for (const m of RIVAL_MILESTONES) { if (m.id === milestone.id) break; if (!rv.met.includes(m.id)) rv.met.push(m.id); }
+}
 function counterTypeFor(typeId) { let best = null, bv = 1; Object.entries(PACK.typeChart).forEach(([atk, row]) => { const v = row[typeId] || 1; if (v > bv) { bv = v; best = atk; } }); return best || typeId; }
 function rivalTeam(save, milestone) {
   const rv = rivalOf(save), tl = teamLevel(save), tb = badgeCount(save), lvl = Math.min(100, Math.max(6, tl + 2 + tb));
@@ -2617,7 +2629,7 @@ function rivalTeam(save, milestone) {
   for (let i = 0; i < size; i++) { const hab = i === size - 1 && pool ? PACK.habitats[pool[Math.floor(r() * pool.length)]] : PACK.habitats[Math.floor(r() * PACK.habitats.length)]; const m = i === size - 1 && pool ? typedPick(pool, counter, lvl + 2, r) : habitatMember(hab, lvl, r); team.push({ speciesId: m.id, level: Math.max(m.min, i === size - 1 ? lvl + 2 : lvl), ace: i === size - 1 }); }
   return { name: rv.name, milestone, team, counter };
 }
-function recordRival(save, milestone, won) { const rv = rivalOf(save); if (!rv.met.includes(milestone.id)) rv.met.push(milestone.id); if (won) rv.record.wins++; else rv.record.losses++; }
+function recordRival(save, milestone, won) { rivalSkipTo(save, milestone); const rv = rivalOf(save); if (!rv.met.includes(milestone.id)) rv.met.push(milestone.id); if (won) rv.record.wins++; else rv.record.losses++; }
 // --- Master rematches: once Champion of the region, each leader offers a Lv 90+ full team for a gold badge ---
 function masterTeam(g) { const r = rng(hash32(g.mx, g.my, 2903)), t = PACK.habByType.get(g.type), team = [], lvl = POST.MASTER_LEVEL; for (let i = 0; i < TEAM_MAX; i++) { const L = lvl + (i === TEAM_MAX - 1 ? 5 : 0); const m = typedPick(t && t.idx, g.type, L, r); team.push({ speciesId: m.id, level: Math.max(m.min, L), ace: i === TEAM_MAX - 1 }); } const line = aceLine(g); if (line) { const a = aceMember(line, Math.min(100, lvl + 5)); team[TEAM_MAX - 1] = { speciesId: a.id, level: Math.min(100, lvl + 5), ace: true }; } return team; }
 function masterAvailable(save, g) { return !g.league && legendUnlocked(save, g.gx, g.gy) && hasBadge(save, g) && !(save.badges[regionKey(g.gx, g.gy)].gyms[g.mi] || {}).gold; }
@@ -2897,7 +2909,7 @@ function updateHud() {
   if (MP.token && state.save && !LOWPOWER.on) { const gk = d.gx + ',' + d.gy; if (state.lastGhostKey !== gk) { state.lastGhostKey = gk; mpGhostsNear(d).then(() => { document.getElementById('trainersBar').dataset.key = ''; }); const wk = weekIndex(Date.now()), rk = regionKey(d.gx, d.gy), skey = rk + '#' + wk; if (!SHARED_WEEKS.has(skey)) { const local = evilTeamFor(state.save, d.gx, d.gy, wk); rpc('wp_region_week', { p_token: MP.token, p_pack: packId(), p_grid: gridTag(), p_region_key: rk + (isDefaultWorld() ? '' : '@' + worldCode(WORLD.SEED)), p_week: wk, p_seed: local.seed }).then(r => { if (r && r.ok) { SHARED_WEEKS.set(skey, r); state.lastLmKey = ''; osm.lastKey = ''; updateHud(); } }).catch(() => {}); } } }
   routeVoiceTick(d);
   { const lk = d.gx + ',' + d.gy + '|' + Math.round(state.lat * 2e4) + ',' + Math.round(state.lon * 2e4) + '|' + (state.battle ? 1 : 0); if (state.lastLmKey !== lk) { state.lastLmKey = lk; if (state.save) updateLandmarks(d); } }
-  { const rb = document.getElementById('rivalBtn'); const due = state.save && !state.battle ? rivalDue(state.save) : null; if (due) { const rv = rivalOf(state.save); rb.style.display = 'block'; rb.textContent = rv.name + ' wants a battle after ' + due.label; rb.onclick = () => { if (firstAble(state.save) < 0) { flash('Heal first.'); return; } const rt = rivalTeam(state.save, due); const foes = rt.team.map(e => trainerInstance(e, rt.name + '’s ')); startBattle('rival', foes, { rival: rt, milestone: due }, '"Been watching you. Show me." ' + rt.name + ' sends out ' + PACK.speciesById.get(foes[0].speciesId).name + '!'); }; } else rb.style.display = 'none'; }
+  { const rb = document.getElementById('rivalBtn'); const due = state.save && !state.battle ? rivalDue(state.save) : null; if (due) { const rv = rivalOf(state.save); rb.style.display = 'block'; rb.innerHTML = '\u2694 ' + esc2(rv.name) + ' challenges you. Tap to battle.<small style="display:block;font-weight:400;opacity:.8">Your rival, now that you have ' + esc2(due.label) + '. Hold to put it off until tomorrow.</small>'; { let held = null; rb.onpointerdown = () => { held = setTimeout(() => { held = 'done'; rv.snoozeDay = dayIndex(Date.now()); rv.snoozeFor = due.id; persistSave(); rb.style.display = 'none'; flash(rv.name + ' will wait until tomorrow.', 5000); }, 650); }; rb.onpointerup = rb.onpointerleave = () => { if (held && held !== 'done') clearTimeout(held); }; } rb.onclick = () => { if (rv.snoozeDay === dayIndex(Date.now()) && rv.snoozeFor === due.id) return; if (firstAble(state.save) < 0) { flash('Heal first.'); return; } const rt = rivalTeam(state.save, due); const foes = rt.team.map(e => trainerInstance(e, rt.name + '’s ')); startBattle('rival', foes, { rival: rt, milestone: due }, '"Been watching you. Show me." ' + rt.name + ' sends out ' + PACK.speciesById.get(foes[0].speciesId).name + '!'); }; } else rb.style.display = 'none'; }
   { const leg = state.save ? activeLegend(state.save, d.gx, d.gy, dayIndex(Date.now()), Date.now()) : null; const hl = document.getElementById('hLegend'), lb = document.getElementById('legendBtn'); state.legend = leg;
     if (leg) { const lc = cellCenter(leg.rx, leg.ry), ld = haversineM(state.lat, state.lon, lc.lat, lc.lon); if (!leg.attempted) maybeNotify('leg:' + leg.region + ':' + dayIndex(Date.now()) + ':' + leg.speciesId, leg.species.name + ' is out today', 'On route ' + leg.routeNo + ' in ' + d.region + ', ' + fmtD(ld) + ' away.'); hl.style.display = 'block'; hl.textContent = '★ ' + leg.species.name + (leg.roamed ? ' (roamed here)' : '') + ' on route ' + leg.routeNo + ', ' + (d.rx === leg.rx && d.ry === leg.ry ? 'here' : fmtD(ld) + ' ' + compass(bearingDeg(state.lat, state.lon, lc.lat, lc.lon))) + (leg.attempted ? '. You have had your attempt today.' : '');
       const here = d.rx === leg.rx && d.ry === leg.ry && !state.battle; lb.style.display = here ? 'block' : 'none'; const watched = isWatched(d.gx, d.gy, weekIndex(Date.now()), leg, regionLegends(d.gx, d.gy, seasonOf(Date.now())));
@@ -3112,7 +3124,29 @@ const osm = { ok: false, map: null, tiles: null, cells: null, gyms: null, me: nu
 // Spoken directions, using the phone's own voice. Announces the next turn at 400 m, 100 m and at the turn, then arrival.
 const VOICE = { on: false, spoken: '', unlocked: false, name: '', pitch: 1, rate: 1 };
 try { const v = JSON.parse(localStorage.getItem('scouter-voicecfg') || '{}'); if (v.name) VOICE.name = v.name; if (v.pitch) VOICE.pitch = v.pitch; if (v.rate) VOICE.rate = v.rate; } catch (e) {}
-function voiceList() { try { return (window.speechSynthesis.getVoices() || []).filter(v => !v.lang || /^en|^fr|^es|^de|^ur|^pa|^hi/i.test(v.lang)); } catch (e) { return []; } }
+// A phone ships a handful of speaking voices and, on iOS, a pile of novelty ones (Bells, Bubbles, Jester
+// and so on) that are useless for directions. Those are pushed out of the way, and what is left is sorted
+// so that the voices of each accent sit together rather than the novelties crowding the top.
+const NOVELTY_VOICES = /^(albert|bad news|bahh|bells|boing|bubbles|cellos|good news|jester|organ|superstar|trinoids|whisper|wobble|zarvox|junior|kathy|ralph|fred|grandma|grandpa|rocko|shelley|sandy|eddy|flo|reed|bahh)$/i;
+function voiceIsNovelty(v) { return NOVELTY_VOICES.test(String(v.name || '').replace(/\s*\(.*\)$/, '').trim()); }
+function voiceLangLabel(v) {
+  const l = String(v.lang || '').replace('_', '-');
+  const names = { 'en-US': 'American', 'en-GB': 'British', 'en-AU': 'Australian', 'en-IE': 'Irish', 'en-IN': 'Indian',
+    'en-ZA': 'South African', 'en-NZ': 'New Zealand', 'en-SG': 'Singapore', 'en-CA': 'Canadian',
+    'ur-PK': 'Urdu', 'pa-IN': 'Punjabi', 'hi-IN': 'Hindi', 'fr-CA': 'French (Canada)', 'fr-FR': 'French',
+    'es-ES': 'Spanish', 'es-MX': 'Spanish (Mexico)', 'de-DE': 'German', 'ar-SA': 'Arabic' };
+  return names[l] || l || '';
+}
+function voiceList(all) {
+  let vs = [];
+  try { vs = (window.speechSynthesis.getVoices() || []).slice(); } catch (e) { return []; }
+  if (!all) {
+    const spoken = vs.filter(v => !voiceIsNovelty(v));
+    if (spoken.length) vs = spoken;
+  }
+  const rank = v => (/en/i.test(v.lang || '') ? 0 : 1);
+  return vs.sort((a, b) => rank(a) - rank(b) || String(a.lang).localeCompare(String(b.lang)) || String(a.name).localeCompare(String(b.name)));
+}
 function chosenVoice() { const l = voiceList(); return l.find(v => v.name === VOICE.name) || null; }
 function voiceCfgSave() { try { localStorage.setItem('scouter-voicecfg', JSON.stringify({ name: VOICE.name, pitch: VOICE.pitch, rate: VOICE.rate })); } catch (e) {} }
 const ROUTE_VOICE = { on: false, last: '', lastRegion: '' };
@@ -3638,7 +3672,7 @@ document.getElementById('guideBtn').addEventListener('click', () => { const d = 
 
 
 // ----- what's new: shown once when the version changes -----
-const APP_VERSION = '108';
+const APP_VERSION = '110';
 // Version notes, newest first. versionNotes(n, since) gives the most recent n, or everything after the
 // version this phone was last on, whichever is the shorter walk back.
 function versionNotes(limit, since) {
@@ -3657,6 +3691,10 @@ function versionNotesHtml(notes) {
     + n.items.map(i => '<div class="noteItem">• ' + i + '</div>').join('') + '</div>').join('') + '</div>';
 }
 const WHATS_NEW = {
+  '110': ['The blue banner at the top was your rival asking for a battle, and it read like a condition still to be met, so it just sat there. It now says plainly that it is a challenge: tap it to fight.',
+    'If you have walked past a rival fight, the rival now offers the one you have actually reached rather than the oldest, and fighting it settles the earlier ones too. Hold the banner to put it off until tomorrow.'],
+  '109': ['The voice list is usable now. Your phone\'s novelty voices (Bells, Bubbles, Jester and the rest) are out of the way, each voice is named with its accent, and they are grouped so the accents sit together.',
+    'If your phone only offers one accent, that is your phone rather than the game: on iPhone, Settings, Accessibility, Spoken Content, Voices adds Irish, Scottish, Indian, South African, Australian and many more. The picker says so now.'],
   '108': ['After an update, the game now tells you everything that changed since you were last here, up to five versions back, and the list scrolls.',
     'The full version log is under Menu, Data, alongside Backup and Reset.'],
   '107': ['Fixed: if the server answered the duel list oddly, the Online sheet stopped drawing. It now copes with whatever comes back.'],
@@ -4897,14 +4935,31 @@ document.getElementById('voicePick').addEventListener('click', () => {
   menu.classList.remove('show');
   const t = document.getElementById('toast'); document.getElementById('tImg').style.display = 'none';
   document.getElementById('tSp').textContent = 'Choose a voice';
-  document.getElementById('tMeta').innerHTML = 'Your phone supplies these. Tap one to hear it. Pitch and speed apply to whichever you pick.<br><br>' +
+  document.getElementById('tMeta').innerHTML = 'These come from your phone, not from the game, so the ones you see are the ones it has installed. '
+    + 'On iPhone, Settings, Accessibility, Spoken Content, Voices adds more: Irish, Scottish, Indian, South African, Australian and many languages besides English. '
+    + 'On Android they come from your speech engine\'s settings. Tap one to hear it.<br><br>' +
     '<div style="display:flex;gap:8px;align-items:center;margin:6px 0"><span style="width:52px">Pitch</span><input id="vPitch" type="range" min="0.5" max="1.8" step="0.1" value="' + VOICE.pitch + '" style="flex:1"><span id="vPitchN" style="width:34px;text-align:right">' + VOICE.pitch.toFixed(1) + '</span></div>' +
     '<div style="display:flex;gap:8px;align-items:center;margin:6px 0"><span style="width:52px">Speed</span><input id="vRate" type="range" min="0.6" max="1.6" step="0.1" value="' + VOICE.rate + '" style="flex:1"><span id="vRateN" style="width:34px;text-align:right">' + VOICE.rate.toFixed(1) + '</span></div>';
   const acts = document.getElementById('tActs'); acts.innerHTML = '';
   const demo = () => { const was = VOICE.on; VOICE.on = true; say('In 400 metres, turn right onto Borden Avenue North.'); VOICE.on = was; };
-  list.slice(0, 14).forEach(v => { const b = document.createElement('button'); b.textContent = v.name.replace(/\(.*\)/, '').trim() + (v.lang ? ' · ' + v.lang : '') + (v.name === VOICE.name ? ' ✓' : ''); b.addEventListener('click', () => { VOICE.name = v.name; voiceCfgSave(); demo(); [...acts.querySelectorAll('button')].forEach(x => { x.textContent = x.textContent.replace(' ✓', ''); }); b.textContent += ' ✓'; document.getElementById('voiceWho').textContent = 'Speaking as ' + v.name + '.'; }); acts.appendChild(b); });
-  const clr = document.createElement('button'); clr.textContent = 'Use the default voice'; clr.addEventListener('click', () => { VOICE.name = ''; voiceCfgSave(); demo(); document.getElementById('voiceWho').textContent = 'Using the phone\'s default voice.'; }); acts.appendChild(clr);
-  const done = document.createElement('button'); done.textContent = 'Done'; done.classList.add('on'); done.addEventListener('click', () => t.classList.remove('show')); acts.appendChild(done);
+  const paint = (showAll) => {
+    acts.innerHTML = '';
+    const vs = voiceList(showAll);
+    vs.forEach(v => { const b = document.createElement('button');
+      const label = v.name.replace(/\s*\(.*\)$/, '').trim(), acc = voiceLangLabel(v);
+      b.textContent = label + (acc ? ' · ' + acc : '') + (v.name === VOICE.name ? ' \u2713' : '');
+      b.addEventListener('click', () => { VOICE.name = v.name; voiceCfgSave(); demo();
+        [...acts.querySelectorAll('button')].forEach(x => { x.textContent = x.textContent.replace(' \u2713', ''); });
+        b.textContent += ' \u2713'; document.getElementById('voiceWho').textContent = 'Speaking as ' + label + (acc ? ', ' + acc : '') + '.'; });
+      acts.appendChild(b); });
+    if (!showAll) { const more = document.createElement('button'); more.textContent = 'Show every voice on this phone';
+      more.addEventListener('click', () => paint(true)); acts.appendChild(more); }
+    const clr2 = document.createElement('button'); clr2.textContent = 'Use the default voice';
+    clr2.addEventListener('click', () => { VOICE.name = ''; voiceCfgSave(); demo(); document.getElementById('voiceWho').textContent = 'Using the phone\'s default voice.'; }); acts.appendChild(clr2);
+    const done2 = document.createElement('button'); done2.textContent = 'Done'; done2.classList.add('on');
+    done2.addEventListener('click', () => t.classList.remove('show')); acts.appendChild(done2);
+  };
+  paint(false);
   t.classList.add('show');
   const ph = document.getElementById('vPitch'), rt = document.getElementById('vRate');
   ph.addEventListener('change', () => { VOICE.pitch = Number(ph.value); document.getElementById('vPitchN').textContent = VOICE.pitch.toFixed(1); voiceCfgSave(); demo(); });
@@ -5504,7 +5559,7 @@ const GUIDE = [
   { id: 'post', title: 'After the title', html: () => `<h3>What opens as Champion</h3>
 <p>Beating a League is recorded against the <b>season</b> it happened in, not once and forever, so a region can be taken again as the seasons turn. The <b>Progress</b> tab lists the seasons you have held and where.</p>
 <p>Standing on a League, <b>Bulletin</b> tells you what is true here: your badges and who holds the title, this week's shiny hunt and watched legend, which team is working the region and what they are after, how your own season is going, and which neighbouring regions you have been to.</p>
-<p>A rival, named when you chose your starter, meets you at your first badge, your fourth, your eighth and at the title. The rival's team is built to counter your starter's type and grows from two creatures to six.</p>
+<p>A rival, named when you chose your starter, appears as a banner at the top of the map when there is a fight waiting: tap it to battle, or hold it to put it off until tomorrow. They meet you at your first badge, your fourth, your eighth and at the title. The rival's team is built to counter your starter's type and grows from two creatures to six.</p>
 <p>Every leader you have beaten in a region where you are Champion offers a master rematch at Lv 90. Winning it turns their badge gold.</p>
 <p>On weekends your League runs tournaments of three rounds, with your own team or a rental team of six. If you hold the titles of three regions in a row, Champion's Road asks you to defend all three in one weekend. On the last weekend of each month, the region's three legends can be fought together at the League, or chased one by one across three neighbouring regions.</p>
 <p>Region mastery is recorded when you have explored every route, earned every badge and caught every family on the region's routes. The Dex tracks the creatures you have seen and caught in the loaded pack.</p>` },
@@ -5551,7 +5606,7 @@ const GUIDE = [
 <h3>Playthroughs</h3>
 <p><b>Layout</b> sets the shape of a region (Domains, Wide or Dense) and <b>route size</b> sets 500 m or 250 m squares. Each combination is a separate playthrough of the same ground, with its own team, box, badges and history. Six in all, listed in the menu. Only coins are shared between them, so switching layout is a fresh start on familiar streets.</p>` },
   { id: 'settings', title: 'Settings and packs', html: () => `<h3>Other options</h3>
-<p><b>Evolution</b> decides whether a creature evolves the moment it can, or waits for your word. Set to <b>Ask me</b>, it says so after the battle, with Evolve or Not yet, and the Team panel keeps the offer open until you take it. <b>Voice</b> chooses which of your phone's voices speaks the directions and route notes, and how high and how fast.</p>
+<p><b>Evolution</b> decides whether a creature evolves the moment it can, or waits for your word. Set to <b>Ask me</b>, it says so after the battle, with Evolve or Not yet, and the Team panel keeps the offer open until you take it. <b>Voice</b> chooses which of your phone's voices speaks the directions and route notes, and how high and how fast. The voices come from your phone rather than from the game, so if you only see one accent, adding more is done in your phone's settings: on iPhone under Accessibility, Spoken Content, Voices. Novelty voices are kept out of the way, and a tap shows every voice installed.</p>
 <p><b>Position</b> switches between live GPS and the simulator. There are also map style, habitat squares, large text, high contrast, alerts, sound effects, area music, the leader-level cap, and what a legend does when it escapes.</p>
 <h3>The screen and your position</h3>
 <p>A website only knows where you are while its page is on screen. Lock the phone or switch apps and the position stops updating until you come back, which is the web's rule and not something the app can work around. <b>Keep the screen awake</b> in the menu stops the phone locking while you play, which is what makes a long walk or a drive work; it costs battery, so turn it off afterwards. If your browser will not hold the screen awake, setting Auto-Lock to Never for the walk does the same.</p>
