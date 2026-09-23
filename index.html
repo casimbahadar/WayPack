@@ -3677,7 +3677,7 @@ document.getElementById('guideBtn').addEventListener('click', () => { const d = 
 
 
 // ----- what's new: shown once when the version changes -----
-const APP_VERSION = '111';
+const APP_VERSION = '112';
 // Version notes, newest first. versionNotes(n, since) gives the most recent n, or everything after the
 // version this phone was last on, whichever is the shorter walk back.
 function versionNotes(limit, since) {
@@ -3696,7 +3696,9 @@ function versionNotesHtml(notes) {
     + n.items.map(i => '<div class="noteItem">• ' + i + '</div>').join('') + '</div>').join('') + '</div>';
 }
 const WHATS_NEW = {
-  '111': ['WayPack has its own icon on your Home Screen now, and its own name. If you added it before, remove the old shortcut and add it again, since a phone keeps the icon it was given the first time.'],
+  '112': ['Important: on iPhone, removing WayPack from your Home Screen deletes your progress with it. The game now saves to the cloud by itself every so often if you have a trainer name, so a lost phone or a deleted icon no longer means a lost game.',
+    'If you ever end up on a new trainer by mistake, Online, You, Use a trainer from another phone now works even when this phone already has one.'],
+  '111': ['WayPack has its own icon and name for anyone adding it to their Home Screen from now on. If you already have it on your Home Screen, keep it as it is: on iPhone, removing it deletes everything the game has stored.'],
   '110': ['The blue banner at the top was your rival asking for a battle, and it read like a condition still to be met, so it just sat there. It now says plainly that it is a challenge: tap it to fight.',
     'If you have walked past a rival fight, the rival now offers the one you have actually reached rather than the oldest, and fighting it settles the earlier ones too. Hold the banner to put it off until tomorrow.'],
   '109': ['The voice list is usable now. Your phone\'s novelty voices (Bells, Bubbles, Jester and the rest) are out of the way, each voice is named with its accent, and they are grouped so the accents sit together.',
@@ -5132,6 +5134,31 @@ function deviceName() { try { let n = localStorage.getItem('scouter-device'); if
 function cloudSlot() { return packId() + ':' + gridTag(); }
 function cloudSeen(slot) { try { return localStorage.getItem('scouter-cloudseen:' + (slot || cloudSlot())) || null; } catch (e) { return null; } }
 function setCloudSeen(slot, stamp) { try { localStorage.setItem('scouter-cloudseen:' + slot, stamp); } catch (e) {} }
+async function takeOverTrainer(h, fc, lc) {
+  if (!h || !fc || !lc) { flash('All three are needed: the trainer name, its friend code, and the link code.'); return false; }
+  let r;
+  try { r = await rpc('wp_link_claim', { p_handle: h, p_friend_code: fc, p_link_code: lc }); } catch (e) { flash('Could not reach the server.'); return false; }
+  if (!r || !r.ok) { flash(((r && r.reason) || 'That did not work') + '.'); return false; }
+  MP.token = r.token; MP.handle = r.handle; MP.code = r.friend_code; mpSave();
+  // straight to that trainer's save: nothing to find, nothing to press
+  try { const got = await rpc('wp_cloud_load', { p_token: MP.token, p_pack: cloudSlot() });
+    if (got && got.ok && got.save) { offerNewerCloud({ updated_at: got.updated_at, device: got.device, save: got.save }, cloudSlot()); }
+    else flash('This phone is now ' + r.handle + '. There is no cloud save for this pack and layout yet.', 9000);
+  } catch (e) { flash('This phone is now ' + r.handle + '. Load your playthrough with Load from cloud.', 9000); }
+  renderMp();
+  return true;
+}
+// Every few minutes of play, and whenever the app is put away, a trainer's game goes to the cloud on its own.
+// It uses the ordinary conflict check, so if the cloud already holds something newer it is offered, never overwritten.
+const AUTOCLOUD = { every: 10 * 60 * 1000, last: 0, busy: false };
+async function autoCloudSave(why) {
+  if (!MP.token || !state.save || !state.save.starterChosen || state.battle || AUTOCLOUD.busy) return;
+  if (why !== 'hidden' && Date.now() - AUTOCLOUD.last < AUTOCLOUD.every) return;
+  AUTOCLOUD.busy = true;
+  try { const r = await mpCloudSave(); if (r && r.ok) AUTOCLOUD.last = Date.now(); } catch (e) {} finally { AUTOCLOUD.busy = false; }
+}
+setInterval(() => autoCloudSave('timer'), 60 * 1000);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') autoCloudSave('hidden'); });
 async function mpCloudSave(opts) {
   if (!MP.token) return { ok: false, reason: 'not registered' };
   const slot = cloudSlot();
@@ -5285,13 +5312,12 @@ async function renderMp(section) {
       + '<div class="row" style="flex-wrap:nowrap"><input id="mpClaimLink" placeholder="Link code" maxlength="6"><button id="mpClaim">Use my trainer here</button></div>'; document.getElementById('mpReg').addEventListener('click', async () => { const h = document.getElementById('mpHandle').value.trim(); if (!h) return; try { await mpRegister(h); await mpPublishGhost(); await mpPublishStats(); renderMp(); } catch (e) { flash('Could not reach the server: ' + e.message); } });
     document.getElementById('mpClaim').addEventListener('click', async () => {
       const h = document.getElementById('mpClaimHandle').value.trim(), fc = document.getElementById('mpClaimCode').value.trim(), lc = document.getElementById('mpClaimLink').value.trim();
-      if (!h || !fc || !lc) { flash('All three are needed: the name, the friend code, and the link code from the first phone.'); return; }
-      try { const r = await rpc('wp_link_claim', { p_handle: h, p_friend_code: fc, p_link_code: lc });
-        if (!r.ok) { flash(r.reason + '.'); return; }
-        MP.token = r.token; MP.handle = r.handle; MP.code = r.friend_code; mpSave(); renderMp();
-        flash('This phone is now ' + r.handle + '. Load your playthrough with Load from cloud.', 8000);
-      } catch (e) { flash('Could not reach the server.'); }
+      await takeOverTrainer(h, fc, lc);
     }); return; }
+  const html_take = '<details style="margin:8px 0"><summary>Use a trainer from another phone</summary>'
+    + '<div class="meta">For a trainer you had before: on another phone, or on this one before it was reinstalled. You need its name, its friend code and a link code, which the other phone makes under Link another phone, or which can be issued for you if that phone is gone. This phone\u2019s current trainer, ' + esc(MP.handle || '') + ' ' + esc(MP.code || '') + ', is left on the server and not deleted.</div>'
+    + '<div class="row"><input id="mpTakeHandle" placeholder="Trainer name"><input id="mpTakeCode" placeholder="Friend code" maxlength="8"></div>'
+    + '<div class="row" style="flex-wrap:nowrap"><input id="mpTakeLink" placeholder="Link code" maxlength="6"><button id="mpTake2">Use that trainer here</button></div></details>';
   let html = '<div class="meta">You are <b>' + esc(MP.handle || 'Trainer') + '</b>, friend code <b class="coin">' + esc(MP.code || '…') + '</b>. A friend code lets someone see which region you are in, never where you are in it. Pins and photos never leave this phone.</div>';
   html += '<div class="tabs" id="oTabs"><button data-tab="you" class="on">You</button><button data-tab="friends">Friends</button><button data-tab="battle">Battle</button><button data-tab="trade">Trade</button></div>';
   html += '<div class="tab" data-tab="you">';
@@ -5301,7 +5327,7 @@ async function renderMp(section) {
     html += '<div class="ph2">Achievements, ' + ach.filter(a => a.done).length + ' of ' + ach.length + ' <button id="achToggle" style="float:right;min-height:30px;padding:0 10px;border-radius:999px;background:var(--panel2);border:1px solid var(--line);color:var(--text);font-size:12px">' + (open ? 'Hide' : 'Show') + '</button></div>';
     if (open) html += '<div id="achWhat" class="meta" style="min-height:20px">Tap one to see what it takes.</div><div style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 4px">' + ach.map(a => { const ic = imgSrc(achievementIcon(a)); return '<button class="badge achBtn" data-ach="' + a.id + '" style="cursor:pointer;' + (a.done ? '' : 'opacity:.4;filter:grayscale(1)') + '">' + (ic ? '<img src="' + ic + '">' : '🏅') + ' ' + esc(a.name) + '</button>'; }).join('') + '</div>';
     else { const recent = ach.filter(a => a.done).slice(-3).map(a => a.name); html += '<div class="meta">' + (recent.length ? 'Latest: ' + recent.join(', ') + '.' : 'None yet. Tap Show to see what they take.') + '</div>'; } }
-  html += '<div class="ph2">Cloud save</div><div class="meta">Keep a copy of this pack\'s save on the server under your trainer code, so a new phone can pick it up. Saved automatically after gym and League wins.</div><div class="row"><button id="mpCloudSave">Save this playthrough</button><button id="mpCloudLoad">Load this playthrough</button></div><div id="mpTier" class="meta" style="margin-top:8px"></div><div id="mpDonor"></div><div class="row"><button id="mpRedeem">Enter a supporter code</button></div><div class="row"><button id="mpCloudSaveAll">Save all six</button><button id="mpCloudLoadAll">Load all six</button><button id="mpLink">Use on another phone</button></div><div id="mpCloudInfo" class="meta"></div>';
+  html += '<div class="ph2">Cloud save</div><div class="meta">Keep a copy of this pack\'s save on the server under your trainer code, so a new phone can pick it up. Saved automatically after gym and League wins.</div><div class="row"><button id="mpCloudSave">Save this playthrough</button><button id="mpCloudLoad">Load this playthrough</button></div>' + html_take + '<div id="mpTier" class="meta" style="margin-top:8px"></div><div id="mpDonor"></div><div class="row"><button id="mpRedeem">Enter a supporter code</button></div><div class="row"><button id="mpCloudSaveAll">Save all six</button><button id="mpCloudLoadAll">Load all six</button><button id="mpLink">Use on another phone</button></div><div id="mpCloudInfo" class="meta"></div>';
   const tradesHtml = '<div class="ph2">Trades</div><div class="meta">Offer a creature and read out the code. Whoever takes it gives one of theirs, and you collect it here.</div><div class="row" style="flex-wrap:nowrap"><button id="mpOffer">Offer a creature</button><input id="mpTradeCode" placeholder="Trade code" maxlength="6"><button id="mpTake">Take</button></div><div id="mpTrades" class="meta">Loading…</div>';
   html += '</div><div class="tab" data-tab="trade" style="display:none">' + tradesHtml;
   html += '<div class="ph2">Egg gifts</div><div class="meta">Send one of your incubating eggs to a friend by code. They walk it the rest of the way; nothing comes back.</div><div class="row" style="flex-wrap:nowrap"><button id="mpGift">Gift an egg</button><input id="mpGiftCode" placeholder="Gift code" maxlength="6"><button id="mpGiftTake">Take</button></div>';
@@ -5367,6 +5393,12 @@ async function renderMp(section) {
       });
       if (supporterAny() && !dn.children.length) dn.innerHTML = '<div class="meta">Nothing switched on yet.</div>';
     } }
+  { const tk = document.getElementById('mpTake2');
+    if (tk) tk.onclick = async () => {
+      const h = document.getElementById('mpTakeHandle').value.trim(), fc = document.getElementById('mpTakeCode').value.trim(), lc = document.getElementById('mpTakeLink').value.trim();
+      if (!confirm('Switch this phone to ' + (h || 'that trainer') + '? This phone\u2019s current trainer stays on the server and is not deleted.')) return;
+      await takeOverTrainer(h, fc, lc);
+    }; }
   { const rb = document.getElementById('mpRedeem');
     if (rb) rb.onclick = async () => {
       const code = prompt('Your supporter code:', ''); if (!code) return;
@@ -5587,6 +5619,7 @@ const GUIDE = [
 <h3>Achievements</h3>
 <p>Twenty-one of them, from your first badge to mastering a region, shown on the You tab of Online. Tap any one to see what it takes and whether you have it. They also appear on your trainer card.</p>` },
   { id: 'saves', title: 'Saving, phones and hosting', html: () => `<h3>Where your game lives</h3>
+<div class="tip"><b>On iPhone, removing WayPack from your Home Screen deletes everything it has stored</b>, because a Home Screen copy keeps its own storage apart from Safari. If you have a trainer name, the game saves to the cloud by itself every ten minutes of play and whenever you put it away, so a deleted icon or a lost phone costs you at most a few minutes. To get back in, use Online, You, Use a trainer from another phone.</div>
 <p>Everything is kept on the device you play on, straight away, with no save button. Each of the six playthroughs is stored separately, so nothing you do in one can disturb another.</p>
 <p><b>Backup</b>, under Data in the menu, writes the playthrough you are in to a file, and <b>Import</b> reads one back on any phone. That file is yours: it needs no account and no network.</p>
 <h3>Supporters</h3>
