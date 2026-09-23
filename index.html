@@ -4,7 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="dark">
-<title>Scouter</title>
+<title>WayPack</title>
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-title" content="WayPack">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" onerror="window.__leafletFailed = true"></script>
 <script src="forge-engine.js"></script>
@@ -3672,7 +3677,7 @@ document.getElementById('guideBtn').addEventListener('click', () => { const d = 
 
 
 // ----- what's new: shown once when the version changes -----
-const APP_VERSION = '110';
+const APP_VERSION = '111';
 // Version notes, newest first. versionNotes(n, since) gives the most recent n, or everything after the
 // version this phone was last on, whichever is the shorter walk back.
 function versionNotes(limit, since) {
@@ -3691,6 +3696,7 @@ function versionNotesHtml(notes) {
     + n.items.map(i => '<div class="noteItem">• ' + i + '</div>').join('') + '</div>').join('') + '</div>';
 }
 const WHATS_NEW = {
+  '111': ['WayPack has its own icon on your Home Screen now, and its own name. If you added it before, remove the old shortcut and add it again, since a phone keeps the icon it was given the first time.'],
   '110': ['The blue banner at the top was your rival asking for a battle, and it read like a condition still to be met, so it just sat there. It now says plainly that it is a challenge: tap it to fight.',
     'If you have walked past a rival fight, the rival now offers the one you have actually reached rather than the oldest, and fighting it settles the earlier ones too. Hold the banner to put it off until tomorrow.'],
   '109': ['The voice list is usable now. Your phone\'s novelty voices (Bells, Bubbles, Jester and the rest) are out of the way, each voice is named with its accent, and they are grouped so the accents sit together.',
