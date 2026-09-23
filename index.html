@@ -827,6 +827,11 @@ function encounter(lat, lon, teamLevel, badges, seed) {
   const r = rng(hash32(d.rx, d.ry, seed | 0, 808));
   const noise = Math.floor(r() * 6) - 2;
   let level = Math.max(2, Math.min(100, Math.round(teamLevel * 0.8 + badges * 2 + noise)));
+  { // a supporter's chosen band for wild creatures: it narrows the range, and never lifts the ceiling
+    const band = (typeof donorOn === 'function') && donorOn('levels') ? DONOR.levels : null;
+    if (band) { const ceiling = Math.max(2, Math.min(100, Math.round(teamLevel * 0.8 + badges * 2 + 3)));
+      const lo = Math.max(2, Math.min(band.min, ceiling)), hi = Math.max(lo, Math.min(band.max, ceiling));
+      level = lo + Math.floor(r() * (hi - lo + 1)); } }
   const legRoll = Math.floor(r() * WORLD.LEGENDARY_ODDS);
   if (badges >= WORLD.LEGENDARY_MIN_BADGES && d.rare >= 0 && legRoll === 0) {
     const pool = PACK.rares[d.rare].members.filter(m => level >= m.minlvl);
@@ -1717,14 +1722,7 @@ function trainersOn(rx, ry, teamLevel, badges, now) {
   const hab = PACK.habitats[routeHabitat(rx, ry)];
   const n = 1 + Math.floor(r() * 3), out = [];
   for (let i = 0; i < n; i++) {
-    const level = (() => {
-    let lv = Math.max(2, Math.min(100, Math.round(teamLevel * 0.8 + badges * 2 + Math.floor(r() * 7) - 3)));
-    const band = (typeof donorOn === 'function') && donorOn('levels') ? DONOR.levels : null;
-    if (band) { const ceiling = Math.max(2, Math.min(100, Math.round(teamLevel * 0.8 + badges * 2 + 3)));   // the band can narrow the range, never lift the cap
-      const lo = Math.max(2, Math.min(band.min, ceiling)), hi = Math.max(lo, Math.min(band.max, ceiling));
-      lv = lo + Math.floor(r() * (hi - lo + 1)); }
-    return lv;
-  })();
+    const level = Math.max(2, Math.min(100, Math.round(teamLevel * 0.8 + badges * 2 + Math.floor(r() * 7) - 3)));
     const size = 1 + Math.floor(r() * 4);   // one to four, evenly, decided when the trainer is generated
     const side = WORLD.MACRO * WORLD.REGION, gx0 = floorDiv(rx, side), gy0 = floorDiv(ry, side);
     const team = [];
@@ -3677,7 +3675,7 @@ document.getElementById('guideBtn').addEventListener('click', () => { const d = 
 
 
 // ----- what's new: shown once when the version changes -----
-const APP_VERSION = '112';
+const APP_VERSION = '113';
 // Version notes, newest first. versionNotes(n, since) gives the most recent n, or everything after the
 // version this phone was last on, whichever is the shorter walk back.
 function versionNotes(limit, since) {
@@ -3696,6 +3694,8 @@ function versionNotesHtml(notes) {
     + n.items.map(i => '<div class="noteItem">• ' + i + '</div>').join('') + '</div>').join('') + '</div>';
 }
 const WHATS_NEW = {
+  '113': ['On iPhone, loading a pack folder or a badge pool now lets you pick the files. iPhone cannot choose folders, and the old picker was set to folders only, so every file was greyed out.',
+    'Fixed: the supporter Level Selector was changing the level of route trainers instead of wild creatures. It now does what it says, and trainers are back to following your team.'],
   '112': ['Important: on iPhone, removing WayPack from your Home Screen deletes your progress with it. The game now saves to the cloud by itself every so often if you have a trainer name, so a lost phone or a deleted icon no longer means a lost game.',
     'If you ever end up on a new trainer by mistake, Online, You, Use a trainer from another phone now works even when this phone already has one.'],
   '111': ['WayPack has its own icon and name for anyone adding it to their Home Screen from now on. If you already have it on your Home Screen, keep it as it is: on iPhone, removing it deletes everything the game has stored.'],
@@ -6071,8 +6071,19 @@ document.getElementById('saveFile').addEventListener('change', async e => {
 // ----- pack loading: scouter folder (pack.json + sprites) or GMS .bin -----
 const packInput = document.getElementById('packFiles'), binInput = document.getElementById('packBin');
 document.getElementById('loadBin').addEventListener('click', () => { menu.classList.remove('show'); binInput.click(); });
-document.getElementById('load').addEventListener('click', () => { menu.classList.remove('show'); packInput.click(); });
-document.getElementById('loadBadges').addEventListener('click', () => { menu.classList.remove('show'); packInput.click(); });
+const CAN_PICK_FOLDERS = (() => { const i = document.createElement('input'); const ua = navigator.userAgent || '';
+  const ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+  return !ios && ('webkitdirectory' in i); })();
+function openPackPicker(what) {
+  menu.classList.remove('show');
+  if (CAN_PICK_FOLDERS) packInput.setAttribute('webkitdirectory', ''); else packInput.removeAttribute('webkitdirectory');
+  if (!CAN_PICK_FOLDERS) flash(what === 'badges'
+    ? 'Choose both badges.png and badges.json: tap Select in the top corner of Files, then tap each one.'
+    : 'Choose every file from the pack folder: open the folder, tap Select, then Select All.', 9000);
+  packInput.click();
+}
+document.getElementById('load').addEventListener('click', () => openPackPicker('pack'));
+document.getElementById('loadBadges').addEventListener('click', () => openPackPicker('badges'));
 binInput.addEventListener('change', async () => {
   const f = binInput.files && binInput.files[0]; if (!f) return; binInput.value = '';
   flash('Reading ' + f.name + ' (' + (f.size / 1048576).toFixed(1) + ' MB)…');
