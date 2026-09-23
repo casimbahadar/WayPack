@@ -1709,7 +1709,7 @@ for (const [label, E, layout] of [['GMS domains', GMS, 'league'], ['GMS dense', 
   check('the charm changes only the shiny odds, and not the weekly hunt\'s', /const CHARM_ODDS = 125/.test(src) && /function shinyOddsNow\(hunt\) \{ return hunt \? POST.HUNT_ODDS/.test(src));
   check('anything the charm finds is marked for life', /charm: \(typeof donorOn === 'function'\) && donorOn\('charm'\) && !hunt/.test(src) && /charm: !!enc.charm/.test(src));
   check('a charm find can never be traded or gifted: it is not even offered', /function isCharmFind/.test(src) && /function tradeBlockReason/.test(src) && /\.filter\(m => !isCharmFind\(m\)\)/.test(src));
-  check('the level band can narrow the range but never lift the badge ceiling', /the band can narrow the range, never lift the cap/.test(src) && /Math.min\(band.min, ceiling\)/.test(src) && /Math.min\(band.max, ceiling\)/.test(src));
+  check('the level band can narrow the range but never lift the badge ceiling', /it narrows the range, and never lifts the ceiling/.test(src) && /Math.min\(band.min, ceiling\)/.test(src) && /Math.min\(band.max, ceiling\)/.test(src));
   check('the shiny lock holds a shiny only, never an ordinary creature or a legend', /!\(wild.shiny && \(typeof donorOn === 'function'\) && donorOn\('hold'\)\)/.test(src));
   check('the trainer card marks a supporter without ranking them, and counts charm finds apart', /supporterAny\(\) \? \{ c: '#e8c33a', n: 'Supporter' \}/.test(src) && /m.shiny && !m.charm/.test(src) && /charm finds/.test(src));
   check('the engine on its own, with no supporter layer, is unchanged', !/CHARM_ODDS/.test(html.slice(html.indexOf('/* CORE-START */'), html.indexOf('/* CORE-END */'))));
@@ -1931,6 +1931,67 @@ for (const [label, E, layout] of [['GMS domains', GMS, 'league'], ['GMS dense', 
   check('putting it off hides it for the day and only that day', !GMS.rivalDue(sv2) && (() => { GMS.rivalOf(sv2).snoozeDay = GMS.dayIndex(Date.now()) - 1; return !!GMS.rivalDue(sv2); })());
   const src = html;
   check('the banner says it is a challenge you can tap, not a condition still to be met', /challenges you. Tap to battle./.test(src) && !/wants a battle after ' \+ due.label/.test(src));
+}
+
+
+{
+  const src = html;
+  check('the page is called WayPack, so a phone names the shortcut properly', /<title>WayPack<\/title>/.test(src) && /apple-mobile-web-app-title" content="WayPack"/.test(src));
+  check('it declares a Home Screen icon for iPhone and a manifest for Android', /rel="apple-touch-icon" href="apple-touch-icon.png"/.test(src) && /rel="manifest" href="manifest.webmanifest"/.test(src));
+}
+
+
+// ---------- 94. v112: never lose a game to a deleted icon ----------
+{
+  const src = html;
+  check('no note anywhere tells a player to remove the app from their Home Screen', !/remove the old shortcut and add it again/.test(src));
+  check('a trainer\'s game goes to the cloud by itself, every ten minutes and whenever the app is put away', /const AUTOCLOUD = \{ every: 10 \* 60 \* 1000/.test(src) && /visibilityState === 'hidden'\) autoCloudSave\('hidden'\)/.test(src) && /setInterval\(\(\) => autoCloudSave\('timer'\), 60 \* 1000\)/.test(src));
+  check('the automatic save never overwrites something newer: it uses the ordinary conflict check', /const r = await mpCloudSave\(\); if \(r && r.ok\) AUTOCLOUD.last = Date.now\(\)/.test(src) && /p_seen: \(opts && opts.force\) \? null : cloudSeen\(slot\)/.test(src));
+  check('it waits for a real game: no starter, no save; mid-battle, no save', /if \(!MP.token \|\| !state.save \|\| !state.save.starterChosen \|\| state.battle \|\| AUTOCLOUD.busy\) return;/.test(src));
+  check('a phone that already has a trainer can still take over an old one', /id="mpTake2"/.test(src) && /Use a trainer from another phone/.test(src) && /async function takeOverTrainer/.test(src));
+  check('taking over goes straight to that trainer\'s save instead of leaving the player to find it', /rpc\('wp_cloud_load', \{ p_token: MP.token, p_pack: cloudSlot\(\) \}\);[\s\S]{0,80}offerNewerCloud/.test(src));
+  check('switching trainers says the current one is left on the server, not deleted', /is left on the server and not deleted/.test(src));
+  check('the guide warns that removing the Home Screen app deletes its storage', /removing WayPack from your Home Screen deletes everything it has stored/.test(src));
+}
+
+
+// ---------- 95. v113: the level band acts on wild creatures, and only on them ----------
+{
+  // run the engine with the supporter layer present, as the game does, and measure what actually comes out
+  const ctx2 = { Math, console, DONOR: { levels: null }, donorOn: id => id === 'levels' && !!ctx2.DONOR.levels };
+  vm.createContext(ctx2);
+  vm.runInContext(CORE + '\nglobalThis.__y = { setPack, parseGmsBin, encounter, trainersOn };', ctx2);
+  const E = ctx2.__y;
+  E.setPack(E.parseGmsBin(readFileSync('/mnt/user-data/uploads/poke9_data_v1_6_gmsdp2.bin', 'utf8')));
+  const wild = on => { ctx2.DONOR.levels = on ? { min: 10, max: 14 } : null; const ls = [];
+    for (let i = 0; i < 300; i++) { const e = E.encounter(43.4516, -80.4925, 30, 2, i); if (e.species && !e.legendary) ls.push(e.level); } return ls; };
+  const tr = on => { ctx2.DONOR.levels = on ? { min: 10, max: 14 } : null; const ls = [];
+    for (let i = 0; i < 200; i++) E.trainersOn(100 + i, 200, 30, 2, Date.now()).forEach(t => ls.push(t.level)); return ls; };
+  let ok = true, detail = '';
+  try {
+    const wOff = wild(false), wOn = wild(true), tOff = tr(false), tOn = tr(true);
+    const span = a => Math.min(...a) + '-' + Math.max(...a);
+    detail = 'wild ' + span(wOff) + ' -> ' + span(wOn) + ', trainers ' + span(tOff) + ' -> ' + span(tOn);
+    check('with a band chosen, wild creatures appear inside it', wOn.length > 50 && wOn.every(l => l >= 10 && l <= 14), detail);
+    check('trainers are not touched by a band meant for wild creatures', JSON.stringify(tOff) === JSON.stringify(tOn), detail);
+    check('with no band chosen, wild levels follow the team as before', Math.min(...wOff) > 20, detail);
+  } catch (e) { check('the level band can be exercised against the real engine', false, e.message); }
+}
+{
+  const src = html;
+  check('on iPhone, which cannot pick folders, the pack and badge pickers take files instead', /const CAN_PICK_FOLDERS/.test(src) && /packInput.removeAttribute\('webkitdirectory'\)/.test(src));
+  check('and the game says which files to choose', /Choose both badges.png and badges.json/.test(src));
+}
+
+
+// ---------- 96. v114: held badges, forgetting where you stand, messages you can see ----------
+{
+  const src = html;
+  check('a badge you already hold is shown from a loaded pool, not only ones won afterwards', /function heldBadge\(regionK, mi, e\)/.test(src) && /const hb = heldBadge\(k, mi, e\)/.test(src) && /const hb = heldBadge\(regionKey\(gx, gy\), mi, e\)/.test(src));
+  check('the pool only changes how a badge looks: the save keeps the original, so unloading restores it', /Nothing in the save changes, so unloading the/.test(src) && !/e.badge = badgeFromPool/.test(src));
+  check('the region you are standing in can be forgotten, and starts again at once', !/Walk elsewhere first, or it will simply be recorded again/.test(src) && /if \(isHere\) \{ state.lastRouteKey = ''; updateHud\(\); \}/.test(src));
+  check('a message shown while a panel is open appears above the panel, not beneath it', /id="flashTop"/.test(src) && /#flashTop \{ position: fixed;[^}]*z-index: 5000/.test(src) && /\['panel', 'menu', 'mpSheet', 'guide', 'dex'\]/.test(src));
+  check('and its text has a fixed light colour, not a variable that can be dark', /#flashTop \{[^}]*color: #e8eee9;/.test(src));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

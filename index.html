@@ -109,6 +109,9 @@
   #toast .sp { font-size: 15px; font-weight: 600; }
   #toast .meta { color: var(--muted); font-size: 12.5px; margin-top: 4px; }
   #toast   .acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; clear: both; }
+  #flashTop { position: fixed; left: 12px; right: 12px; top: calc(env(safe-area-inset-top, 0px) + 10px); z-index: 5000; display: none;
+    background: rgba(20,32,31,.97); color: #e8eee9; border: 1px solid var(--gold, #f2b544); border-radius: 12px; padding: 10px 12px; font-size: 14px; box-shadow: 0 6px 24px rgba(0,0,0,.45); pointer-events: none; }
+  #flashTop.on { display: block; }
   .scrollNotes { max-height: 46vh; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-right: 4px; }
   .noteBlock { border-top: 1px solid var(--line); padding: 8px 0; }
   .noteBlock:first-child { border-top: 0; padding-top: 0; }
@@ -195,7 +198,8 @@
   <div id="arena">
     <div id="osm"></div>
     <canvas id="map" class="hidden"></canvas>
-    <div id="topStack" class="overlay"><button id="gymBtn"></button><button id="bulletinBtn" style="display:none">☷ Bulletin</button><button id="legendBtn" style="display:none"></button><button id="lmBtn" style="display:none"></button><button id="rivalBtn" style="display:none"></button><div id="postBar" style="display:none;gap:6px;flex-wrap:wrap"></div><div id="nav">
+    <div id="flashTop" role="status" aria-live="polite"></div>
+<div id="topStack" class="overlay"><button id="gymBtn"></button><button id="bulletinBtn" style="display:none">☷ Bulletin</button><button id="legendBtn" style="display:none"></button><button id="lmBtn" style="display:none"></button><button id="rivalBtn" style="display:none"></button><div id="postBar" style="display:none;gap:6px;flex-wrap:wrap"></div><div id="nav">
       <div id="navHead"><span id="navTurn"></span><button id="navVoice" aria-label="Spoken directions">🔇</button><button id="navMore" aria-label="More">⋯</button><button id="navClose" aria-label="Stop directions">✕</button></div>
       <div id="navFacts"></div>
       <div id="navRow" class="hide"><div id="navModes"><button data-mode="walk">🚶</button><button data-mode="bike">🚲</button><button data-mode="car">🚗</button><button data-mode="transit" title="Buses, trains and ferries: opens your maps app">🚌</button></div><button id="navPrefer">Quickest</button><button id="navRetry" style="display:none">Retry</button><button id="navMaps">Open in Maps</button><button id="navWhole">Whole route</button></div>
@@ -679,6 +683,19 @@ setPack(DEMO_PACK);
 // ===== Badge pool: an optional spritesheet of badge art per type (region-forge format: rows = types, cells = designs) =====
 // badges.json: { "cell": 40, "cols": N, "types": ["normal", ...], "counts": [n0, n1, ...] } beside badges.png
 let BADGE_POOL = null; // { image: data URL, cell, cols, types, counts }
+// A badge keeps the art it was won with, unless a pool is loaded: then every held badge is shown from the
+// pool, in the same way a gym you have not beaten would be. Nothing in the save changes, so unloading the
+// pool puts the original art back.
+function heldBadge(regionK, mi, e) {
+  if (!e) return null;
+  if (BADGE_POOL && e.gymType) {
+    const m = /:(-?\d+),(-?\d+)$/.exec(String(regionK));
+    if (m) { const gx = +m[1], gy = +m[2], i = +mi;
+      const pb = badgeFromPool(e.gymType, gx * WORLD.REGION + mod(i, WORLD.REGION), gy * WORLD.REGION + Math.floor(i / WORLD.REGION));
+      if (pb) return pb; }
+  }
+  return e.badge || null;
+}
 function setBadgePool(pool) { BADGE_POOL = pool && pool.image && Array.isArray(pool.types) && Array.isArray(pool.counts) ? pool : null; }
 function badgeFromPool(type, mx, my) { if (!BADGE_POOL) return null; const row = BADGE_POOL.types.indexOf(type); if (row < 0 || !(BADGE_POOL.counts[row] > 0)) return null; const idx = hash32(mx, my, strHash(type), 2001) % BADGE_POOL.counts[row]; return { name: null, icon: 'pool:' + type + ':' + idx, pool: true, row, idx }; }
 
@@ -3675,7 +3692,7 @@ document.getElementById('guideBtn').addEventListener('click', () => { const d = 
 
 
 // ----- what's new: shown once when the version changes -----
-const APP_VERSION = '113';
+const APP_VERSION = '114';
 // Version notes, newest first. versionNotes(n, since) gives the most recent n, or everything after the
 // version this phone was last on, whichever is the shorter walk back.
 function versionNotes(limit, since) {
@@ -3694,6 +3711,9 @@ function versionNotesHtml(notes) {
     + n.items.map(i => '<div class="noteItem">• ' + i + '</div>').join('') + '</div>').join('') + '</div>';
 }
 const WHATS_NEW = {
+  '114': ['A badge pool now changes the badges you already hold, not only ones you win afterwards. Your save keeps the original art, so unloading the pool puts it back.',
+    'Forget this region works on the region you are standing in: it starts again straight away, from nothing. Before, it refused, and said why somewhere you could not see.',
+    'Messages the game shows while a panel is open now appear on top of it. Several had been hidden underneath.'],
   '113': ['On iPhone, loading a pack folder or a badge pool now lets you pick the files. iPhone cannot choose folders, and the old picker was set to folders only, so every file was greyed out.',
     'Fixed: the supporter Level Selector was changing the level of route trainers instead of wild creatures. It now does what it says, and trainers are back to following your team.'],
   '112': ['Important: on iPhone, removing WayPack from your Home Screen deletes your progress with it. The game now saves to the cloud by itself every so often if you have a trainer name, so a lost phone or a deleted icon no longer means a lost game.',
@@ -3983,7 +4003,14 @@ function catchRipple() { if (!osm.map) return; const el = document.createElement
 function playCue(name) { try { const b64 = PACK.sounds && PACK.sounds.get(name); if (!b64) return; const a = new Audio('data:audio/' + (name.endsWith('.mp3') ? 'mpeg' : 'wav') + ';base64,' + b64); a.volume = 0.6; a.play().catch(() => {}); } catch (e) {} }
 
 // ----- encounters & battles (wild / gym / league) -----
-function flash(msg, ms = 4000) { const f = document.getElementById('flash'); f.textContent = msg; f.classList.add('show'); clearTimeout(f._h); f._h = setTimeout(() => f.classList.remove('show'), ms); }
+function flash(msg, ms = 4000) {
+  const f = document.getElementById('flash'); f.textContent = msg; f.classList.add('show'); clearTimeout(f._h); f._h = setTimeout(() => f.classList.remove('show'), ms);
+  const covered = ['panel', 'menu', 'mpSheet', 'guide', 'dex'].some(id => { const el = document.getElementById(id); return !!el && el.classList.contains('show'); });
+  const top = document.getElementById('flashTop');
+  if (top) { clearTimeout(top._h);
+    if (covered) { top.textContent = msg; top.classList.add('on'); top._h = setTimeout(() => top.classList.remove('on'), ms); }
+    else top.classList.remove('on'); }
+}
 function hpBar(m) { const f = m.maxHp ? m.hp / m.maxHp : 1; return '<div class="hpb"><div class="hpf" style="width:' + Math.round(f * 100) + '%;background:' + (f > 0.5 ? '#3f9a6a' : f > 0.2 ? '#d8a63a' : '#d8503a') + '"></div></div><small>' + m.hp + '/' + m.maxHp + '</small>'; }
 function startBattle(kind, foes, meta, headline) {
   // Every fight that is meant to be a test, in any region: gyms, the League, title defences, rematches,
@@ -4470,7 +4497,7 @@ function renderTeam() {
   let any = false;
   for (const [k, r] of Object.entries(state.save.badges)) {
     if (!keyInGrid(k)) continue;
-    for (const e of Object.values(r.gyms || {})) { any = true; const s = document.createElement('span'); s.className = 'badge'; const ic = e.badge && imgSrc(e.badge.icon); s.innerHTML = (ic ? '<img src="' + ic + '">' : '🏅') + ' ' + (e.gold ? 'Gold ' : '') + (e.badge ? e.badge.name : e.gymType) + ' <small>' + (r.region || k) + ', ' + e.leader + (e.wins > 1 ? ', won ×' + e.wins : '') + '</small>'; if (e.gold) s.style.borderColor = 'var(--gold)'; pb.appendChild(s); }
+    for (const [mi, e] of Object.entries(r.gyms || {})) { any = true; const s = document.createElement('span'); s.className = 'badge'; const hb = heldBadge(k, mi, e); const ic = hb && imgSrc(hb.icon); s.innerHTML = (ic ? '<img src="' + ic + '">' : '🏅') + ' ' + (e.gold ? 'Gold ' : '') + (e.badge ? e.badge.name : e.gymType) + ' <small>' + (r.region || k) + ', ' + e.leader + (e.wins > 1 ? ', won ×' + e.wins : '') + '</small>'; if (e.gold) s.style.borderColor = 'var(--gold)'; pb.appendChild(s); }
     if (r.champion) { any = true; const s = document.createElement('span'); s.className = 'badge'; s.innerHTML = '🏆 Champion of ' + (r.region || k) + (r.champion > 1 ? ' <small>×' + r.champion + '</small>' : ''); pb.appendChild(s); }
   }
   if (!any) pb.textContent = 'None yet. Walk to a gym (the white dot in each domain) and challenge the leader.';
@@ -5768,7 +5795,7 @@ function showRegion(gx, gy) {
   html += '</div><div class="tab" data-tab="gyms" style="display:none">';
   html += '<div class="ph2">Gyms</div>';
   Object.entries(rec.gyms).sort((a, b) => a[0] - b[0]).forEach(([mi, e]) => {
-    const ic = e.badge && imgSrc(e.badge.icon);
+    const hb = heldBadge(regionKey(gx, gy), mi, e); const ic = hb && imgSrc(hb.icon);
     const gg = gymOf(gx * WORLD.REGION + mi % WORLD.REGION, gy * WORLD.REGION + Math.floor(mi / WORLD.REGION)); const firstTeam = (e.teams && e.teams[0] && e.teams[0].team) || e.lastTeam || []; const aceOpts = aceChoiceOpen(state.save, gg) ? firstTeam.map(t => t.speciesId).filter((id, i, a) => a.indexOf(id) === i && PACK.speciesById.has(id)) : [];
     html += '<div class="mon"' + (ic ? '' : '') + '>' + (ic ? '<img src="' + ic + '">' : '<span class="ph"></span>') + '<span class="nm">' + e.gymName + ' gym, ' + e.leader + (e.wins ? ' ✓' : '') + '<br><small>' + (e.wins ? 'won ×' + e.wins + (typeof e.aceLine === 'number' ? ', ace ' + (e.aceNick ? e.aceNick + ' (' + (PACK.habitats[e.aceLine] || { name: '' }).name.replace(/ Family$/, '') + ' line)' : (PACK.habitats[e.aceLine] || { name: '' }).name.replace(/ Family$/, '') + ' line') + ', chosen by you' : '') : 'not yet beaten') + '</small>' + (e.teams && e.teams.length ? '<div style="margin-top:3px">' + e.teams.map((tt, i) => '<small>' + (i === 0 ? 'First win' : 'Rematch ' + i) + ', leader Lv ' + tt.level + ': ' + fmtTeam(tt.team) + '</small>').join('<br>') + '</div>' : '') + (aceOpts.length ? '<div style="margin-top:4px"><small>Choose their ace now, once, from the team you just beat. It grows with them from here: </small>' + aceOpts.map(id => '<button class="aceBtn" data-mi="' + mi + '" data-sp="' + id + '" style="min-height:28px;padding:0 8px;margin:2px 4px 0 0;border-radius:999px;background:var(--panel2);border:1px solid var(--line);color:var(--text);font-size:11.5px">' + spName(id) + '</button>').join('') + '</div>' : '') + '</span></div>';
   });
@@ -5816,9 +5843,11 @@ function showRegion(gx, gy) {
   { const here = describe(state.lat, state.lon); const isHere = here.gx === gx && here.gy === gy;
     const f = document.createElement('button'); f.textContent = 'Forget this region'; f.style.cssText = 'margin-top:10px;color:var(--bad)';
     f.addEventListener('click', () => {
-      if (isHere) { flash('You are standing in ' + sm.name + '. Walk elsewhere first, or it will simply be recorded again.', 7000); return; }
-      if (!confirm('Forget ' + sm.name + '? Its visits, routes, badges and history leave your records. The creatures you caught there stay with you, and walking back would start it fresh.')) return;
-      forgetRegion(state.save, gx, gy); persistSave(); renderTeam();
+      if (!confirm('Forget ' + sm.name + '? Its visits, routes, badges and history leave your records, and the creatures you caught there stay with you.'
+        + (isHere ? ' You are standing in it, so it starts again straight away, from nothing.' : ' Walking back would start it fresh.'))) return;
+      forgetRegion(state.save, gx, gy); persistSave();
+      if (isHere) { state.lastRouteKey = ''; updateHud(); }   // standing in it: it begins again at once, empty
+      renderTeam();
       det.style.display = 'none'; main.style.display = 'block'; flash(sm.name + ' was removed from your records.', 6000);
     });
     det.appendChild(f); }
