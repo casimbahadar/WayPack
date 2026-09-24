@@ -10,7 +10,7 @@ const CORE = m[1];
 function load() {
   const ctx = { Math, console };
   vm.createContext(ctx);
-  vm.runInContext(CORE + '\nglobalThis.__x = { rivalDue, recordRival, rivalOf, duelStart, duelTurn, duelResult, duelReplay, duelAgrees, duelAlive, evilProfile, seasonLabel, recordSeasonTitle, seasonTitles, heldThisSeason, WORLD, GYM, get PACK() { return PACK; }, DEMO_PACK, validatePack, validateGmsPack, isGmsPack, parseGmsBin, setPack, regionGymList, gymCell, routeHabitat, routeRare, habitatMember, badgeCount, regionBadgeCount, hasBadge, recordGymWin, recordChampion, leaderLevel, leaderTeamSize, aceLine, leaderTeam, championTeam, trainerInstance, bestTypeEff, cellCenter, bearingDeg, compass, regionKey, EGG, addEggWalk, rollWildItem, addItem, removeItem, itemEvolutions, evolveWithItem, HISTORY_MAX, regionRecord, logEvent, touchRoute, routesSeen, logGymWin, logChampion, regionSummary, regionLore, LORE, NAME_BLOCK, regionLeaders, TRAINER, trainersOn, trainerBeaten, recordTrainerWin, trainerReward, pickTrainerClass, snareName, dayIndex, setLayout, isLeagueDomain, gymsPerRegion, leagueBadgesNeeded, leagueCell, setRouteSize, leagueIndexOf, typeHalves, aceMember, COIN, addCoinWalk, spend, ENGINE_ITEMS, itemName, itemInfo, useItemOn, SHOP, packShopPool, dayPrice, shopFor, buy, PERSONALITIES, personalityOf, moodLine, badgeSvg, LEADER_LINES, leaderLine, setAceOverride, aceLineFor, leaderTeamFor, DEFENCE, challengerAt, championChallenger, TYPE_NAMES, NAME_POOL_MIN, leaderPool, setBadgePool, badgeFromPool, get BADGE_POOL() { return BADGE_POOL; }, ELITE, eliteFour, titleOf, leagueLadder, loseTitle, reclaimTitle, usurperDefended, CONTEND, contendSlot, POST, RIVAL_MILESTONES, rivalOf, rivalDue, counterTypeFor, rivalTeam, recordRival, masterTeam, masterAvailable, recordMaster, regionMastery, roadEligible, isWeekend, roadState, roadDefence, recordRoadLeg, questsFor, questStatus, questBump, questClaim, huntFamily, tournamentBracket, rentalTeam, lastWeekend, gauntletLegends, gauntletChaseSites, LANDMARK, weekIndex, contestedCount, overpassQuery, parseOverpass, fallbackLandmarks, SHARED_WEEKS, EVIL_TEAMS, EVIL_OLD_PARTS, EVIL_MOTIVES, STARTER_DEX, starterPool, evilProfile, isMegaStone, heldBoost, MUSIC_BY_TYPE, musicRecipe, pvpRound, pvpRand, teamSnapshot, teamFromSnapshot, creatureToWire, creatureFromWire, personalityOf, LazyImages, ACHIEVEMENTS, achievements, achievementIcon, evilBook, evilTeamFor, evilFinish, weekPlan, evilState, gruntAt, adminAt, bossAt, evilEncounterAt, recordEvilWin, stopVisit, gridTag, parseRegionKey, keyInGrid, baseProfile, powerMult, shapeBy, PROFILE_CLAMP, lightAD, SHINY, HANDICAP, MIGRATION, NEIGHBOURS, baseRouteHabitat, migratedHabitat, freeRestAvailable, takeFreeRest, freeRestsLeft, isRestStop, restFound, findRest, setWorldSeed, worldCode, seedFromCode, WORLD_DEFAULT_SEED, WORLD_CODE_MAX, isDefaultWorld, teamNeedsRest, snareName, ENGINE_ITEMS, EVOLVE, evolveNow, isShopStop, shopStock, SHOP_KINDS, LM_KINDS, LM_TIER2, overpassQuery, LANDMARK, parseOverpass, landmarkTarget, fallbackLandmarks, setLayout, FREE_RESTS_PER_DAY, STARTER_DEX_LIST, applyLevelCap, liftLevelCap, grantXpReal, legalMembers, typedPick, aceChoiceOpen, evilTeamMember, regionScale, championLevel, isNight, seasonName, HAPPY_M, condMatch, formOf, speciesView, evolutionsReady, creatureTraits, holdItem, unholdItem, SIGNATURES, signatureFor, lightMoves, lightExpected, aiPickLight, teachTm, forgetTm, typeName, LEGEND, seasonOf, legendUnlocked, regionLegends, legendState, legendCaught, activeLegend, legendEncounter, legendShinyOdds, regionVariant, variantName, geneCount, variantStats, VARIANT, statsFor, ADAPTED, adaptedTypes, adaptedName, adaptedHue, adaptedTint, TYPE_TINT, wildInstance, isWatched, watchedLegend, LEGEND_SHINY, legendAttempt, roamedInto, SNARES, catchChance, fleeChance, throwSnare, newSave, migrateSave, teamLevel, makeMonster, addMonster, moveToBox, moveToTeam, addWalk, starterOffer, TEAM_MAX, SNARE_REFILL_M, statsFor, movesAtLevel, hydrate, xpToNext, xpForWin, grantXp, effectiveness, makeCombatant, damageFull, damageLight, expectedDamage, aiPickMove, battleRoundFull, battleRoundLight, wildInstance, healAll, firstAble, hash32, rng, routeCell, cellBounds, macroOf, regionOf, macroIndex, LEAGUE_INDEX, routeNumber, haversineM, regionName, gymOf, describe, encounter, NAME_BLOCKLIST };', ctx);
+  vm.runInContext(CORE + '\nglobalThis.__x = { leaderTeam, aiPickLight, lightExpected, regionCurve, gymIndexFor, coverageType, rivalDue, recordRival, rivalOf, duelStart, duelTurn, duelResult, duelReplay, duelAgrees, duelAlive, evilProfile, seasonLabel, recordSeasonTitle, seasonTitles, heldThisSeason, WORLD, GYM, get PACK() { return PACK; }, DEMO_PACK, validatePack, validateGmsPack, isGmsPack, parseGmsBin, setPack, regionGymList, gymCell, routeHabitat, routeRare, habitatMember, badgeCount, regionBadgeCount, hasBadge, recordGymWin, recordChampion, leaderLevel, leaderTeamSize, aceLine, leaderTeam, championTeam, trainerInstance, bestTypeEff, cellCenter, bearingDeg, compass, regionKey, EGG, addEggWalk, rollWildItem, addItem, removeItem, itemEvolutions, evolveWithItem, HISTORY_MAX, regionRecord, logEvent, touchRoute, routesSeen, logGymWin, logChampion, regionSummary, regionLore, LORE, NAME_BLOCK, regionLeaders, TRAINER, trainersOn, trainerBeaten, recordTrainerWin, trainerReward, pickTrainerClass, snareName, dayIndex, setLayout, isLeagueDomain, gymsPerRegion, leagueBadgesNeeded, leagueCell, setRouteSize, leagueIndexOf, typeHalves, aceMember, COIN, addCoinWalk, spend, ENGINE_ITEMS, itemName, itemInfo, useItemOn, SHOP, packShopPool, dayPrice, shopFor, buy, PERSONALITIES, personalityOf, moodLine, badgeSvg, LEADER_LINES, leaderLine, setAceOverride, aceLineFor, leaderTeamFor, DEFENCE, challengerAt, championChallenger, TYPE_NAMES, NAME_POOL_MIN, leaderPool, setBadgePool, badgeFromPool, get BADGE_POOL() { return BADGE_POOL; }, ELITE, eliteFour, titleOf, leagueLadder, loseTitle, reclaimTitle, usurperDefended, CONTEND, contendSlot, POST, RIVAL_MILESTONES, rivalOf, rivalDue, counterTypeFor, rivalTeam, recordRival, masterTeam, masterAvailable, recordMaster, regionMastery, roadEligible, isWeekend, roadState, roadDefence, recordRoadLeg, questsFor, questStatus, questBump, questClaim, huntFamily, tournamentBracket, rentalTeam, lastWeekend, gauntletLegends, gauntletChaseSites, LANDMARK, weekIndex, contestedCount, overpassQuery, parseOverpass, fallbackLandmarks, SHARED_WEEKS, EVIL_TEAMS, EVIL_OLD_PARTS, EVIL_MOTIVES, STARTER_DEX, starterPool, evilProfile, isMegaStone, heldBoost, MUSIC_BY_TYPE, musicRecipe, pvpRound, pvpRand, teamSnapshot, teamFromSnapshot, creatureToWire, creatureFromWire, personalityOf, LazyImages, ACHIEVEMENTS, achievements, achievementIcon, evilBook, evilTeamFor, evilFinish, weekPlan, evilState, gruntAt, adminAt, bossAt, evilEncounterAt, recordEvilWin, stopVisit, gridTag, parseRegionKey, keyInGrid, baseProfile, powerMult, shapeBy, PROFILE_CLAMP, lightAD, SHINY, HANDICAP, MIGRATION, NEIGHBOURS, baseRouteHabitat, migratedHabitat, freeRestAvailable, takeFreeRest, freeRestsLeft, isRestStop, restFound, findRest, setWorldSeed, worldCode, seedFromCode, WORLD_DEFAULT_SEED, WORLD_CODE_MAX, isDefaultWorld, teamNeedsRest, snareName, ENGINE_ITEMS, EVOLVE, evolveNow, isShopStop, shopStock, SHOP_KINDS, LM_KINDS, LM_TIER2, overpassQuery, LANDMARK, parseOverpass, landmarkTarget, fallbackLandmarks, setLayout, FREE_RESTS_PER_DAY, STARTER_DEX_LIST, applyLevelCap, liftLevelCap, grantXpReal, legalMembers, typedPick, aceChoiceOpen, evilTeamMember, regionScale, championLevel, isNight, seasonName, HAPPY_M, condMatch, formOf, speciesView, evolutionsReady, creatureTraits, holdItem, unholdItem, SIGNATURES, signatureFor, lightMoves, lightExpected, aiPickLight, teachTm, forgetTm, typeName, LEGEND, seasonOf, legendUnlocked, regionLegends, legendState, legendCaught, activeLegend, legendEncounter, legendShinyOdds, regionVariant, variantName, geneCount, variantStats, VARIANT, statsFor, ADAPTED, adaptedTypes, adaptedName, adaptedHue, adaptedTint, TYPE_TINT, wildInstance, isWatched, watchedLegend, LEGEND_SHINY, legendAttempt, roamedInto, SNARES, catchChance, fleeChance, throwSnare, newSave, migrateSave, teamLevel, makeMonster, addMonster, moveToBox, moveToTeam, addWalk, starterOffer, TEAM_MAX, SNARE_REFILL_M, statsFor, movesAtLevel, hydrate, xpToNext, xpForWin, grantXp, effectiveness, makeCombatant, damageFull, damageLight, expectedDamage, aiPickMove, battleRoundFull, battleRoundLight, wildInstance, healAll, firstAble, hash32, rng, routeCell, cellBounds, macroOf, regionOf, macroIndex, LEAGUE_INDEX, routeNumber, haversineM, regionName, gymOf, describe, encounter, NAME_BLOCKLIST };', ctx);
   return ctx.__x;
 }
 const A = load(), B = load();
@@ -757,8 +757,9 @@ for (const [label, E, layout] of [['GMS domains', GMS, 'league'], ['GMS dense', 
   GMS.recordGymWin(sv, g); const team0 = GMS.leaderTeamFor(sv, g, 0); GMS.logGymWin(sv, g, team0, 0, 1000, true);
   const other = team0.find(m => !m.ace);
   check('ace override refused for a species outside the pack, accepted for one from the beaten team', !GMS.setAceOverride(sv, g, 'nope') && (other ? GMS.setAceOverride(sv, g, other.speciesId) : true));
+  { let k = 0; for (let mx = g.gx * 3; mx < g.gx * 3 + 3; mx++) for (let my = g.gy * 3; my < g.gy * 3 + 3; my++) { const o = GMS.gymOf(mx, my); if (!o.league && o.mi !== g.mi && k < 7) { GMS.recordGymWin(sv, o); k++; } } }   // progress through the region
   const team1 = GMS.leaderTeamFor(sv, g, 8);
-  check('after choosing, the leader\'s ace comes from the chosen line and still grows with badges', !other || (GMS.aceLineFor(sv, g).members.some(m => m.id === team1[team1.length - 1].speciesId) && team1[team1.length - 1].ace && team1[team1.length - 1].level === GMS.leaderLevel(8, g.gx, g.gy) + GMS.GYM.ACE_BONUS), other ? GMS.PACK.speciesById.get(other.speciesId).name + ' line → ace now ' + GMS.PACK.speciesById.get(team1[team1.length - 1].speciesId).name : 'single-member team');
+  check('after choosing, the leader\'s ace comes from the chosen line and still grows with badges', !other || (GMS.aceLineFor(sv, g).members.some(m => m.id === team1[team1.length - 1].speciesId) && team1[team1.length - 1].ace && team1[team1.length - 1].level === GMS.leaderLevel(GMS.gymIndexFor(sv, g), g.gx, g.gy) + GMS.GYM.ACE_BONUS), other ? GMS.PACK.speciesById.get(other.speciesId).name + ' line → ace now ' + GMS.PACK.speciesById.get(team1[team1.length - 1].speciesId).name : 'single-member team');
   // title defence at a held gym: ~50% of days, never before the badge, never twice a day
   let days = 0, appear = 0; for (let d = 0; d < 200; d++) { if (GMS.challengerAt(sv, g, d, 1)) appear++; days++; }
   const g2 = GMS.gymOf(9, 5); const none = GMS.challengerAt(sv, g2.league ? GMS.gymOf(10, 5) : g2, 5, 1);
@@ -771,7 +772,7 @@ for (const [label, E, layout] of [['GMS domains', GMS, 'league'], ['GMS dense', 
   check('no champion challenger before you are Champion', GMS.championChallenger(sv, lg, 3) === null);
   GMS.recordChampion(sv, lg); let cc = null, cc2 = null; for (let slot = 0; slot < 50 && !(cc && cc2); slot++) { const c = GMS.championChallenger(sv, lg, slot); if (c && c.kind === 'leader') { if (!cc) cc = c; else if (c.name !== cc.name) cc2 = c; } }
   const leaders = []; for (let m = 0; m < 9; m++) if (!GMS.isLeagueDomain(g.gx, g.gy, m)) leaders.push(GMS.gymOf(g.gx * 3 + m % 3, g.gy * 3 + Math.floor(m / 3)).leader);
-  check('as Champion, region leaders come for the title with teams above their gym level', cc && leaders.includes(cc.name) && cc2 && cc.team.length >= 2 && cc.team.every(m => m.level >= GMS.leaderLevel(GMS.badgeCount(sv) + 4, lg.gx, lg.gy)), cc.name + ' then ' + cc2.name);
+  check('as Champion, region leaders come for the title with teams above their gym level', cc && leaders.includes(cc.name) && cc2 && cc.team.length >= 2 && cc.team.every(m => m.level >= GMS.leaderLevel(GMS.gymsPerRegion() - 1, lg.gx, lg.gy)), cc.name + ' then ' + cc2.name);
 }
 
 
@@ -907,10 +908,10 @@ for (const [label, E, layout] of [['GMS domains', GMS, 'league'], ['GMS dense', 
 // ---------- 37. Region gym scale, enemy priority, forms and conditional evolutions ----------
 {
   const P = GMS.PACK;
-  const scales = new Set(); let inRange = true; for (let i = 0; i < 200; i++) { const sc = GMS.regionScale(i * 7 - 300, i * 3 - 100); scales.add(sc.base + '/' + sc.step); if (sc.base < 9 || sc.base > 14 || sc.step < 4 || sc.step > 6) inRange = false; }
-  check('regions start leaders at Lv 9–14 and step 4–6 per badge; many distinct scales', inRange && scales.size >= 12, scales.size + ' distinct base/step pairs');
+  const scales = new Set(); let inRange = true; for (let i = 0; i < 200; i++) { const sc = GMS.regionScale(i * 7 - 300, i * 3 - 100); scales.add(sc.base + '/' + sc.step); if (sc.base < 9 || sc.base > 14 || sc.step < 3 || sc.step > 6) inRange = false; }
+  check('regions start leaders at Lv 9–14 and step 3–8 per badge won there; many distinct scales', (() => { let ok = true; const seen = new Set(); for (let i = 0; i < 300; i++) { const sc = GMS.regionScale(i * 7 - 300, i * 3 - 100); seen.add(sc.base + '/' + sc.step); if (sc.base < 9 || sc.base > 14 || sc.step < 3 || sc.step > 8) ok = false; } return ok && seen.size >= 30; })());
   const champs = new Set(); let cMin = 999, cMax = 0; for (let i = 0; i < 300; i++) { const c = GMS.championLevel(i, -i, 0); champs.add(c); cMin = Math.min(cMin, c); cMax = Math.max(cMax, c); }
-  check('champion level at zero badges spans 50–66 and differs between regions', cMin === 50 && cMax === 66 && champs.size >= 8, cMin + '–' + cMax + ', ' + champs.size + ' distinct');
+  check('the League sits at Lv 50–68 and differs between regions', cMin >= 50 && cMax <= 68 && cMax >= 64 && champs.size >= 12, cMin + '–' + cMax + ', ' + champs.size + ' distinct');
   check('a region\'s ladder is internally consistent: elites below its champion, leaders below its elites', (() => { const g = GMS.gymOf(7, 3), lg = { league: true, gx: g.gx, gy: g.gy, mi: GMS.leagueIndexOf(g.gx, g.gy) }; const e4 = GMS.eliteFour(lg, 8, 0); const ch = GMS.championLevel(g.gx, g.gy, 8); return e4.every(e => e.level < ch) && GMS.leaderLevel(8, g.gx, g.gy) < e4[0].level; })());
   check('without a region, leaderLevel keeps the old 8 + 5×badges default', GMS.leaderLevel(0) === 8 && GMS.leaderLevel(4) === 28);
   // enemy Quick Jab priority
@@ -1224,7 +1225,7 @@ for (const [label, E, layout] of [['GMS domains', GMS, 'league'], ['GMS dense', 
   const t2 = GMS.leaderTeamFor(sv, g, 8); const inst = GMS.trainerInstance(t2[t2.length - 1], 'X’s ');
   check('the leader\'s ace carries the nickname into battle and stays on the chosen line', t2[t2.length - 1].nick === 'Blaze' && GMS.makeCombatant(inst).sp.name === 'Blaze' && GMS.aceLineFor(sv, g).members.some(m => m.id === t2[t2.length - 1].speciesId));
   // level cap on the player's team
-  GMS.HANDICAP.OFFSET = null; check('leaders follow the region scale only; the setting never raises them', GMS.leaderLevel(0, g.gx, g.gy) === regionBaseOf(g.gx, g.gy));
+  GMS.HANDICAP.OFFSET = null; check('the first gym in a region follows that region\'s own scale', GMS.leaderLevel(0, g.gx, g.gy) === GMS.regionCurve(g.gx, g.gy).levels[0] && GMS.leaderLevel(0, g.gx, g.gy) >= 9 && GMS.leaderLevel(0, g.gx, g.gy) <= 14);
   const svc = GMS.newSave(); const strong = GMS.makeMonster(svc, { species: P.speciesById.get('0006char'), level: 60 }, null); const weak = GMS.makeMonster(svc, { species: P.speciesById.get('0004char'), level: 8 }, null); svc.team.push(strong, weak); strong.hp = Math.round(strong.maxHp / 2);
   GMS.HANDICAP.OFFSET = -3; const n = GMS.applyLevelCap(svc, 20 + GMS.HANDICAP.OFFSET);
   check('with "Leader −3" and a Lv 20 leader (cap 17), a Lv 60 creature fights at 17 with half its HP kept as a fraction; a Lv 8 one is untouched', n === 1 && strong.level === 17 && strong.capped.level === 60 && Math.abs(strong.hp / strong.maxHp - 0.5) < 0.05 && weak.level === 8 && !weak.capped);
@@ -1992,6 +1993,82 @@ for (const [label, E, layout] of [['GMS domains', GMS, 'league'], ['GMS dense', 
   check('the region you are standing in can be forgotten, and starts again at once', !/Walk elsewhere first, or it will simply be recorded again/.test(src) && /if \(isHere\) \{ state.lastRouteKey = ''; updateHud\(\); \}/.test(src));
   check('a message shown while a panel is open appears above the panel, not beneath it', /id="flashTop"/.test(src) && /#flashTop \{ position: fixed;[^}]*z-index: 5000/.test(src) && /\['panel', 'menu', 'mpSheet', 'guide', 'dex'\]/.test(src));
   check('and its text has a fixed light colour, not a variable that can be dark', /#flashTop \{[^}]*color: #e8eee9;/.test(src));
+}
+
+
+// ---------- 97. v115: a curve per region, leaders that cannot be walled, names that differ ----------
+{
+  const P = GMS.PACK;
+  let lo1 = 99, hi1 = 0, loL = 99, hiL = 0, sLo = 99, sHi = 0, n = 0;
+  for (let gx = -40; gx < 40; gx += 3) for (let gy = -40; gy < 40; gy += 7) { const c = GMS.regionCurve(gx, gy); n++;
+    lo1 = Math.min(lo1, c.levels[0]); hi1 = Math.max(hi1, c.levels[0]); loL = Math.min(loL, c.league); hiL = Math.max(hiL, c.league);
+    for (let i = 1; i < c.levels.length; i++) { const d = c.levels[i] - c.levels[i - 1]; sLo = Math.min(sLo, d); sHi = Math.max(sHi, d); } }
+  check('the first gym in every region is Lv 9 to 14', lo1 === 9 && hi1 === 14, n + ' regions');
+  check('each badge won in a region adds 3 to 8 levels there, until the gyms reach five under the Champion', sLo >= 0 && sHi === 8 && (() => { let ok = true; for (let gx = -30; gx < 30; gx += 3) { const c = GMS.regionCurve(gx, 5); if (c.levels.some(l => l > c.league - 5)) ok = false; } return ok; })());
+  check('the League sits between Lv 50 and 68', loL === 50 && hiL === 68, loL + '–' + hiL);
+  // the situation that prompted this: a Normal gym against a lone Ghost
+  const ghost = GMS.makeMonster(GMS.newSave(), { species: P.speciesById.get('0092gast'), level: 12 }, null);
+  let gyms = 0, walled = 0, mono = 0, covered = 0;
+  for (let mx = -60; mx < 60 && gyms < 40; mx++) for (let my = -20; my < 20 && gyms < 40; my++) { const g = GMS.gymOf(mx, my); if (g.league || g.type !== 'normal') continue; gyms++;
+    const team = GMS.leaderTeam(g, 0, null); let hurt = false;
+    team.forEach(e => { const sp = P.speciesById.get(e.speciesId); if (sp.types.length === 1) { mono++; if (e.tm && e.tm !== sp.types[0]) covered++; }
+      const at = GMS.makeCombatant(GMS.trainerInstance(e, '')), df = GMS.makeCombatant(ghost);
+      if (GMS.lightExpected(at, df, GMS.aiPickLight(at, df, false)) > 0) hurt = true; });
+    if (!hurt) walled++; }
+  check('every one-typed creature of a gym leader carries an attack of another type', mono > 0 && covered === mono, covered + ' of ' + mono);
+  check('no Normal gym can be walled by a single Ghost any more', gyms > 10 && walled === 0, gyms + ' gyms, ' + walled + ' walled');
+  const src = html;
+  check('the level choice is asked at the battle, only when you outlevel the other side, and the menu setting is gone', /function askLevelCap/.test(src) && /if \(mine > top\) \{ askLevelCap/.test(src) && !/id="handicap"/.test(src));
+  check('a cap above your own team is never offered, since it would change nothing', /if \(cap != null && cap >= mine\) return;/.test(src));
+  // names
+  const names = []; for (let gx = -20; gx < 20; gx++) for (let gy = -10; gy < 10; gy++) names.push(GMS.regionName(gx, gy));
+  const ends = {}; names.forEach(x => { const k = x.slice(-2); ends[k] = (ends[k] || 0) + 1; });
+  const topEnd = Math.max(...Object.values(ends)) / names.length;
+  check('region names hardly ever repeat', new Set(names).size >= names.length * 0.98, new Set(names).size + ' of ' + names.length);
+  check('and their endings vary as much as their beginnings', Object.keys(ends).length >= 60 && topEnd < 0.07, Object.keys(ends).length + ' endings, commonest ' + (topEnd * 100).toFixed(1) + '%');
+  check('names stay sayable: no triple letters, no long consonant runs, at most one double vowel', names.every(x => !/([a-z])\1\1/i.test(x) && (x.toLowerCase().match(/ai|ei|ou|ia|ea/g) || []).length <= 1));
+}
+
+
+// ---------- 98. v117: every region climbs its own varied ladder ----------
+{
+  let n = 0; const br = { smallBack: 0, smallMany: 0, bigMany: 0, bigRun4: 0, eliteUnder: 0, stepOut: 0, lastOut: 0 };
+  const firsts = new Set(), champs = [];
+  for (let gx = -40; gx < 40; gx += 3) for (let gy = -40; gy < 40; gy += 7) {
+    const c = GMS.regionCurve(gx, gy), st = c.steps, last = c.levels[c.levels.length - 1]; n++;
+    firsts.add(c.levels[0]); champs.push(c.league);
+    if (st.some(x => x < 3 || x > 8)) br.stepOut++;
+    if (last < 44 || last > 60) br.lastOut++;
+    st.forEach((x, i) => { if (i && x === st[i - 1] && x <= 5) br.smallBack++; });
+    [3, 4, 5].forEach(v => { if (st.filter(x => x === v).length > 2) br.smallMany++; });
+    [6, 7, 8].forEach(v => { if (st.filter(x => x === v).length > 3) br.bigMany++; });
+    let run = 0; st.forEach(x => { run = x >= 6 ? run + 1 : 0; if (run > 3) br.bigRun4++; });
+    const e4 = GMS.eliteFour({ league: true, gx, gy, mi: GMS.leagueIndexOf(gx, gy) }, 8, 0);
+    if (e4.some(e => e.level <= last)) br.eliteUnder++;
+  }
+  check('a region\'s first gym is Lv 9 to 14', Math.min(...firsts) === 9 && Math.max(...firsts) === 14);
+  check('every step between gyms is 3 to 8 levels, and the eighth gym lands at Lv 44 to 60', br.stepOut === 0 && br.lastOut === 0, n + ' regions');
+  check('a small step (3–5) never follows itself and appears at most twice in a ladder', br.smallBack === 0 && br.smallMany === 0);
+  check('a big step (6–8) appears at most three times, and never more than three big steps run together', br.bigMany === 0 && br.bigRun4 === 0);
+  check('the Champion is Lv 50 to 68, and every Elite sits above the eighth gym', Math.min(...champs) >= 50 && Math.max(...champs) <= 68 && br.eliteUnder === 0, Math.min(...champs) + '–' + Math.max(...champs));
+  check('the same region always climbs the same ladder', JSON.stringify(GMS.regionCurve(12, -9)) === JSON.stringify(GMS.regionCurve(12, -9)));
+}
+
+
+// ---------- 99. v118: the climb eases after a big jump ----------
+{
+  const banned = ['8,8,8', '8,7,8', '8,8,7', '7,8,8', '7,8,7'];
+  let n = 0, worst = 0; const br = { banned: 0, after8: 0, after87: 0, after78: 0, after876: 0, over21: 0 };
+  for (let gx = -40; gx < 40; gx += 3) for (let gy = -40; gy < 40; gy += 7) { const st = GMS.regionCurve(gx, gy).steps; n++;
+    for (let i = 0; i < st.length; i++) { const a = st[i - 3], b = st[i - 2], p = st[i - 1], x = st[i];
+      if (i >= 2 && banned.includes([b, p, x].join(','))) br.banned++;
+      if (p === 8 && x > 7) br.after8++; if (b === 8 && p === 7 && x > 6) br.after87++; if (b === 7 && p === 8 && x > 6) br.after78++;
+      if (a === 8 && b === 7 && p === 6 && x > 6) br.after876++;
+      if (i >= 2) { const t = b + p + x; worst = Math.max(worst, t); if (t > 21) br.over21++; } } }
+  check('none of 8,8,8 / 8,7,8 / 8,8,7 / 7,8,8 / 7,8,7 ever happens', br.banned === 0, n + ' regions');
+  check('an 8 is followed by 7 or less, and 8,7 or 7,8 by 6 or less', br.after8 === 0 && br.after87 === 0 && br.after78 === 0);
+  check('after 8,7,6 the next step stays at 6 or less', br.after876 === 0);
+  check('no three gyms in a row climb more than 21 levels', br.over21 === 0 && worst <= 21, 'steepest ' + worst);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

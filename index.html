@@ -275,7 +275,6 @@
       <div class="item"><div class="lbl">Position<small id="gpsDesc">Live GPS follows your phone. Simulator lets you walk with a pad.</small></div><button id="gps">Live GPS</button></div>
       <div class="item"><div class="lbl">Keep the screen awake<small id="wakeDesc">Stops the phone locking while you play, so your position keeps updating. A locked screen stops a website tracking you at all</small></div><button id="wakeBtn">Off</button></div>
       <div class="item"><div class="lbl">Low power<small id="lowDesc">Fewer location fixes, no new map tiles, online checks paused. For long walks</small></div><button id="lowPower">Off</button></div>
-      <div class="item"><div class="lbl">Battle at the leader's level<small>In every serious battle (gyms, the League, title defences, rematches, tournaments, Champion's Road, your rival, the evil team, the legend gauntlet and other players' teams) your creatures are capped to the strongest opponent's level, or a few below. Wild creatures, route trainers and legends themselves are untouched</small></div><button id="handicap">Off</button></div>
       <div class="item"><div class="lbl">Experience<small id="xpShareDesc">Who learns from a win</small></div><button id="xpShareBtn">The one who fought</button></div>
       <div class="item"><div class="lbl">Evolution<small id="evoDesc">Creatures evolve as soon as they are ready</small></div><button id="evoAsk">Automatic</button></div>
       <div class="item"><div class="lbl">Legends that escape<small>Stay in their region for tomorrow, or roam to a neighbouring region you must chase</small></div><button id="roam">Stay</button></div>
@@ -436,13 +435,44 @@ const SYL_C = ['to', 'en', 'oh', 'ar', 'os', 'dea', 'ia', 'ova', 'um', 'or', 'is
 // Every hash in the engine is salted with WORLD.SEED, so changing it is a different world on the same streets.
 // The default is the world everyone shares; any other seed is your own, and can be handed to a friend as a code.
 const WORLD_DEFAULT_SEED = 20260903;
-function setWorldSeed(n) { WORLD.SEED = (n >>> 0) || WORLD_DEFAULT_SEED; leaderCache.clear(); }
+function setWorldSeed(n) { WORLD.SEED = (n >>> 0) || WORLD_DEFAULT_SEED; leaderCache.clear(); if (typeof curveCache !== 'undefined') curveCache.clear(); }
 const WORLD_CODE_MAX = Math.pow(36, 6);   // six characters, so a code always names exactly one world
 function worldCode(seed) { return (seed >>> 0).toString(36).toUpperCase().padStart(6, '0'); }
 function seedFromCode(code) { const c = String(code || '').trim().toUpperCase(); if (!/^[0-9A-Z]{1,6}$/.test(c)) return null; const v = parseInt(c, 36); return Number.isFinite(v) && v > 0 ? (v >>> 0) : null; }
 function isDefaultWorld() { return WORLD.SEED === WORLD_DEFAULT_SEED; }
+// Names built sound by sound, not from a fixed start and a fixed end, so their endings vary as much as
+// their beginnings. Mostly simple vowels and gentle consonants, so a name can be said aloud.
+const NAME_ONSETS = ['', '', 'b', 'br', 'c', 'd', 'dr', 'f', 'g', 'gr', 'h', 'j', 'k', 'l', 'l', 'm', 'm', 'n', 'n', 'p', 'r', 'r', 's', 's', 'sh', 't', 't', 'th', 'tr', 'v', 'v', 'w', 'y', 'z', 'st', 'kh', 'fl', 'cr'];
+const NAME_VOWELS = ['a', 'a', 'a', 'e', 'e', 'i', 'i', 'o', 'o', 'u', 'ai', 'ei', 'ou', 'ia'];
+const NAME_INNER = ['', '', '', '', 'n', 'r', 'l', 's'];
+const NAME_FINAL = ['', '', '', 'n', 'n', 'r', 'r', 'l', 's', 'th', 'm', 'nd', 'rn', 'x', 'll', 'rd', 'sh', 'st', 'k', 'ra', 'na', 'ia', 'el', 'is', 'on', 'or', 'ea', 'al', 'ett', 'wyn', 'mar', 'dale', 'ven'];
+const NAME_WORDS = /^(lick|dick|cock|butt|fart|piss|crap|dung|slut|whore|rape|nazi|kill|dead|poop|puke|snot|cum|tit|ass|fuk|sux|shit|damn|hell|homo|fag|nig|kike|spic|chink|gook|coon|twat|wank|bum|arse)/i;
+function soundName(r) {
+  for (let tries = 0; tries < 40; tries++) {
+    const sylls = r() < 0.08 ? 1 : r() < 0.7 ? 2 : 3;
+    let s = '';
+    for (let i = 0; i < sylls; i++) {
+      const last = i === sylls - 1;
+      s += NAME_ONSETS[Math.floor(r() * NAME_ONSETS.length)];
+      s += NAME_VOWELS[Math.floor(r() * NAME_VOWELS.length)];
+      s += last ? NAME_FINAL[Math.floor(r() * NAME_FINAL.length)] : NAME_INNER[Math.floor(r() * NAME_INNER.length)];
+    }
+    if (s.length < 4 || s.length > 9) continue;
+    if (/([a-z])\1\1/.test(s) || /[aeiouy]{3}/.test(s) || /[^aeiouy]{3}/.test(s.replace(/(th|sh|kh|ll|tt|nd|rn|rd|st|tr|dr|br|gr|fl|cr)/g, 'X')) || NAME_WORDS.test(s)) continue;
+    if ((s.match(/ai|ei|ou|ia|ea/g) || []).length > 1) continue;   // one double vowel at most
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  }
+  return null;
+}
 function regionName(gx, gy) {
   const n = PACK.naming;
+  if (!n) {
+    const r = rng(hash32(gx, gy, 102));
+    for (let attempt = 0; attempt < 20; attempt++) {
+      const name = soundName(r);
+      if (name && !NAME_BLOCKLIST.map(x => x.toLowerCase()).some(b => name.toLowerCase().includes(b))) return name;
+    }
+  }
   const A = n ? n.prefixes : SYL_A, B = n ? (n.middles || []) : SYL_B, C = n ? n.suffixes : SYL_C;
   const block = (n ? (n.blocklist || []) : NAME_BLOCKLIST).map(x => x.toLowerCase());
   const r = rng(hash32(gx, gy, 101));
@@ -1224,10 +1254,67 @@ function healAll(save) { [...save.team, ...save.box].forEach(m => { hydrate(m); 
 function firstAble(save) { return save.team.findIndex(m => m.hp > 0 && PACK.speciesById.has(m.speciesId)); }
 
 // ===== Gym leaders: badge-scaled teams with a designated ace that grows with the leader =====
-// Each region has its own starting level (6–14) and step per badge (4–6), so leaders and champions differ between regions.
-function regionScale(gx, gy) { if (gx == null) return { base: GYM.BASE_LEVEL, step: GYM.PER_BADGE }; const h = hash32(gx, gy, 2301); return { base: 9 + (h % 6), step: 4 + ((h >>> 8) % 3) }; }   // first gym Lv 9–14
-function leaderLevel(totalBadges, gx, gy) { const sc = regionScale(gx, gy); return Math.min(97, sc.base + sc.step * totalBadges); }
-function championLevel(gx, gy, totalBadges) { const sc = regionScale(gx, gy); return Math.min(100, Math.max(GYM.CHAMPION_MIN, sc.base + sc.step * gymsPerRegion() + 4) + 2 * totalBadges); }   // 50–66 at zero badges
+// Each region has its own starting level (9–14) and step per badge won there (3–8), so leaders and champions differ between regions.
+function regionScale(gx, gy) { if (gx == null) return { base: GYM.BASE_LEVEL, step: GYM.PER_BADGE }; const h = hash32(gx, gy, 2301); return { base: 9 + (h % 6), step: 3 + ((h >>> 8) % 6) }; }   // first gym Lv 9–14, then 3–8 per badge in that region
+// Each region climbs its own ladder, counting only the badges you win there. The first gym is Lv 9 to 14.
+// Every gym after it is 3 to 8 levels higher, and the steps keep changing: a small step (3–5) never follows
+// itself and turns up at most twice in a ladder; a big one (6–8) may repeat, up to three times, but never
+// more than three big steps in a row. After an 8 the climb eases (8 then 7 or less, 8,7 then 6 or less), so
+// no three gyms in a row climb more than 21 levels. The eighth
+// gym lands between Lv 44 and 60, and the League follows just above it: the Champion one step and a little
+// past the last gym, never below Lv 50 or above Lv 68, with the Elite Four between them.
+const LEAGUE_MAX = 68, LAST_GYM_MIN = 44, LAST_GYM_MAX = 60;
+var curveCache = new Map();   // var: setWorldSeed, earlier in the file, may clear it before this line has run
+function regionCurve(gx, gy) {
+  const n = Math.max(1, gymsPerRegion()), key = WORLD.SEED + ':' + gx + ',' + gy + ':' + n;
+  if (curveCache.has(key)) return curveCache.get(key);
+  const r = rng(hash32(gx, gy, n, 2311));
+  let levels = null, steps = null;
+  for (let tries = 0; tries < 400 && !levels; tries++) {
+    const base = 9 + Math.floor(r() * 6), st = [];
+    for (let i = 1; i < n; i++) {
+      let s2, guard = 0;
+      // a small step (3–5) never follows itself and appears at most twice in a ladder; a big step (6–8) may
+      // repeat freely, but the same one at most three times, and never more than three big steps running
+      const bigRun = (() => { let k = 0; for (let q = st.length - 1; q >= 0 && st[q] >= 6; q--) k++; return k; })();
+      do { s2 = 3 + Math.floor(r() * 6); guard++; }
+      while (guard < 80 && (
+        (s2 <= 5 && st.length && s2 === st[st.length - 1]) ||
+        (s2 <= 5 && st.filter(x => x === s2).length >= 2) ||
+        (s2 >= 6 && st.filter(x => x === s2).length >= 3) ||
+        (s2 >= 6 && bigRun >= 3) ||
+        // after an 8 the climb has to ease off: 8 is followed by 7 or less; 8,7 and 7,8 by 6 or less; and
+        // after 8,7,6 it stays at 6 or less, so no three gyms in a row ever climb more than 21 levels
+        (st.length >= 1 && st[st.length - 1] === 8 && s2 > 7) ||
+        (st.length >= 2 && st[st.length - 2] === 8 && st[st.length - 1] === 7 && s2 > 6) ||
+        (st.length >= 2 && st[st.length - 2] === 7 && st[st.length - 1] === 8 && s2 > 6) ||
+        (st.length >= 3 && st[st.length - 3] === 8 && st[st.length - 2] === 7 && st[st.length - 1] === 6 && s2 > 6) ||
+        (st.length >= 2 && st[st.length - 2] + st[st.length - 1] + s2 > 21)));
+      st.push(s2);
+    }
+    const lv = [base]; st.forEach(x => lv.push(lv[lv.length - 1] + x));
+    const last = lv[lv.length - 1];
+    if (n < 8 || (last >= LAST_GYM_MIN && last <= LAST_GYM_MAX)) { levels = lv; steps = st; }
+  }
+  if (!levels) { levels = [9]; steps = []; for (let i = 1; i < n; i++) { const x = [5, 6, 5, 7, 5, 6, 5][(i - 1) % 7]; steps.push(x); levels.push(levels[i - 1] + x); } }
+  const last = levels[levels.length - 1];
+  const league = Math.min(LEAGUE_MAX, Math.max(GYM.CHAMPION_MIN, last + 6 + (hash32(gx, gy, 2312) % 4)));
+  const out = { levels, steps, base: levels[0], league };
+  curveCache.set(key, out);
+  return out;
+}
+function leaderLevel(k, gx, gy) {
+  if (gx == null) return Math.min(97, GYM.BASE_LEVEL + GYM.PER_BADGE * (k | 0));
+  const c = regionCurve(gx, gy); return c.levels[Math.max(0, Math.min(c.levels.length - 1, k | 0))];
+}
+// which step of the region's curve a gym fights at: the first you take there is 0
+function gymIndexFor(save, g) {
+  if (!save || g.gx == null) return 0;
+  const have = regionBadgeCount(save, g.gx, g.gy);
+  // a new gym is the next step on the curve; a rematch meets you where you are now, so early gyms keep pace
+  return Math.max(0, Math.min(gymsPerRegion() - 1, have));
+}
+function championLevel(gx, gy) { return gx == null ? GYM.CHAMPION_MIN : regionCurve(gx, gy).league; }   // just above the region's last gym, Lv 50–68
 function leaderTeamSize(totalBadges) { return Math.min(GYM.LEADER_MAX, GYM.TEAM_MIN + Math.floor(totalBadges / GYM.BADGES_PER_SLOT)); }
 function habitatPeakPower(h) { return Math.max(...h.members.map(m => (PACK.speciesById.get(m.id) || { power: 0 }).power)); }
 // The ace LINE is fixed per gym (deterministic); the ace's species is whichever member of that line fits the ace's level,
@@ -1248,7 +1335,16 @@ function aceMember(line, level) {
   const pool = fits.length ? fits : legal.length ? legal : [line.members.reduce((a, b) => (b.min < a.min ? b : a))];
   return pool.slice().sort((a, b) => (b.min - a.min) || ((PACK.speciesById.get(b.id) || { power: 0 }).power - (PACK.speciesById.get(a.id) || { power: 0 }).power))[0];
 }
-function leaderTeam(g, totalBadges, teamLvHint) { // returns [{ speciesId, level, ace }]
+function coverageType(sp, seed) {
+  if (!sp || (sp.types || []).length !== 1) return null;   // two types already means two kinds of attack
+  const pool = PACK.gyms.map(x => x.type).filter(t => t && t !== sp.types[0]);
+  return pool.length ? pool[hash32(seed, strHash(sp.id), 4401) % pool.length] : null;
+}
+function withCoverage(team, seed) {
+  team.forEach((e, i) => { const t = coverageType(PACK.speciesById.get(e.speciesId), hash32(seed, i)); if (t) e.tm = t; });
+  return team;
+}
+function leaderTeam(g, totalBadges, teamLvHint) { // returns [{ speciesId, level, ace, tm }]
   const lvl = leaderLevel(totalBadges, g.gx, g.gy), size = leaderTeamSize(totalBadges), r = rng(hash32(g.mx, g.my, totalBadges, 910));
   const line = aceLine(g), team = [];
   const t = PACK.habByType.get(g.type);
@@ -1259,14 +1355,14 @@ function leaderTeam(g, totalBadges, teamLvHint) { // returns [{ speciesId, level
   const aceLvl = Math.min(100, lvl + GYM.ACE_BONUS);
   if (line) { const m = aceMember(line, aceLvl); team.push({ speciesId: m.id, level: aceLvl, ace: true }); }
   else if (team.length) team[team.length - 1].ace = true;
-  return team;
+  return withCoverage(team, hash32(g.mx, g.my, 4402));
 }
 function championTeam(g, totalBadges, teamLvHint) {
   const lvl = championLevel(g.gx, g.gy, totalBadges), r = rng(hash32(g.gx, g.gy, totalBadges, 911));
   const strong = [...PACK.habitats].filter(h => h.members.length).sort((a, b) => habitatPeakPower(b) - habitatPeakPower(a)).slice(0, 12);
   const team = [];
   for (let s = 0; s < TEAM_MAX; s++) { const hab = strong[Math.floor(r() * strong.length)]; const m = habitatMember(hab, lvl, r); team.push({ speciesId: m.id, level: lvl, ace: s === TEAM_MAX - 1 }); }
-  return team;
+  return withCoverage(team, hash32(g.gx, g.gy, 4403));
 }
 // Duels must produce the same battle on both phones, so they draw from a generator seeded by the duel's
 // own code rather than from Math.random. Play and replay run through exactly this code, which is what
@@ -1317,7 +1413,7 @@ function duelReplay(mineWire, theirsWire, inputs, code) {
 function duelAgrees(claim, computed) {
   return !!claim && computed.standing === (claim.standing | 0) && computed.turns === (claim.turns | 0);
 }
-function trainerInstance(entry, label) { const m = { uid: 0, speciesId: entry.speciesId, level: entry.level, shiny: false, legendary: false, xp: 0, hp: null, moves: null, ace: !!entry.ace, label, nick: entry.nick || undefined }; hydrate(m); return m; }
+function trainerInstance(entry, label) { const m = { uid: 0, speciesId: entry.speciesId, level: entry.level, shiny: false, legendary: false, xp: 0, hp: null, moves: null, ace: !!entry.ace, label, nick: entry.nick || undefined, tm: entry.tm || null }; hydrate(m); return m; }
 
 // ===== Eggs (pack: eggFrequency weights which family, eggCycles × EGG_CYCLE_M metres to hatch) =====
 const EGG = { FIND_EVERY_M: 800, FIND_CHANCE: 0.5, CYCLE_M: 150, MAX: 3, HATCH_LEVEL: 5 };
@@ -1874,7 +1970,7 @@ function setAceOverride(save, g, speciesId, nick) { const k = regionKey(g.gx, g.
   const sp = PACK.speciesById.get(speciesId); if (!sp || sp.familyIndex == null) return false; e.aceLine = sp.familyIndex; if (nick) e.aceNick = String(nick).trim().slice(0, 16); return true; }
 function aceChoiceOpen(save, g) { const r = save.badges[regionKey(g.gx, g.gy)]; const e = r && r.gyms[g.mi]; return !!(e && e.wins === 1 && typeof e.aceLine !== 'number'); }
 function aceLineFor(save, g) { const r = save && save.badges[regionKey(g.gx, g.gy)]; const e = r && r.gyms[g.mi]; if (e && typeof e.aceLine === 'number' && PACK.habitats[e.aceLine]) return PACK.habitats[e.aceLine]; return aceLine(g); }
-function leaderTeamFor(save, g, totalBadges) { const line = aceLineFor(save, g); const team = leaderTeam(g, totalBadges, save ? teamLevel(save) : null); const r = save && save.badges[regionKey(g.gx, g.gy)]; const e = r && r.gyms[g.mi]; if (line && team.length) { const aceLvl = team[team.length - 1].level; const m = aceMember(line, aceLvl); team[team.length - 1] = { speciesId: m.id, level: Math.max(aceLvl, m.min), ace: true }; } if (e && e.aceNick && team.length) team[team.length - 1].nick = e.aceNick; return team; }
+function leaderTeamFor(save, g, totalBadges) { if (save) totalBadges = gymIndexFor(save, g); const line = aceLineFor(save, g); const team = leaderTeam(g, totalBadges, save ? teamLevel(save) : null); const r = save && save.badges[regionKey(g.gx, g.gy)]; const e = r && r.gyms[g.mi]; if (line && team.length) { const aceLvl = team[team.length - 1].level; const m = aceMember(line, aceLvl); team[team.length - 1] = { speciesId: m.id, level: Math.max(aceLvl, m.min), ace: true }; } if (e && e.aceNick && team.length) team[team.length - 1].nick = e.aceNick; return team; }
 
 // ===== Title defence: once you hold a badge, a challenger may wait at that gym; as Champion, the region's leaders come for your title =====
 const DEFENCE = { CHANCE: 0.5, COIN_REWARD: 40, CHAMPION_COIN: 120 };
@@ -1895,7 +1991,7 @@ function championChallenger(save, g, slot) {
   const rec = save.badges[regionKey(g.gx, g.gy)]; if (!rec || !rec.champion || !rec.title || rec.title.holder !== 'you') return null;
   const key = 'champ:' + regionKey(g.gx, g.gy) + ':' + slot; if (trainerBeaten(save, key)) return null;
   const r = rng(hash32(g.gx, g.gy, slot, 1902)); if (r() > CONTEND.CHANCE) return null;
-  const tb = badgeCount(save), champLvl = championLevel(g.gx, g.gy, tb), leaderLvl = leaderLevel(tb, g.gx, g.gy);
+  const tb = badgeCount(save), champLvl = championLevel(g.gx, g.gy), leaderLvl = leaderLevel(gymsPerRegion() - 1, g.gx, g.gy);   // a leader defending against a Champion fights at full strength
   const former = rec.title.former;
   const roll = r(), kind = roll < 0.35 ? 'leader' : roll < 0.6 ? 'elite' : roll < 0.85 ? 'trainer' : (former ? 'former' : 'leader');
   if (kind === 'leader') {
@@ -2915,7 +3011,7 @@ function updateHud() {
   const fmtD = m => m >= 1000 ? (m / 1000).toFixed(1) + ' km' : Math.round(m) + ' m';
   let gymTxt;
   if (d.atLeague) gymTxt = '<span class="flag">⚑</span> League here, ' + have + ' of ' + need + ' badges';
-  else if (d.atGym) gymTxt = '<span class="flag">⚑</span> ' + g.gym.name + ' gym here, ' + g.leader + ' Lv ' + leaderLevel(tb, g.gx, g.gy) + (hasBadge(state.save, g) ? ', badge won' : '');
+  else if (d.atGym) gymTxt = '<span class="flag">⚑</span> ' + g.gym.name + ' gym here, ' + g.leader + ' Lv ' + leaderLevel(gymIndexFor(state.save, g), g.gx, g.gy) + (hasBadge(state.save, g) ? ', badge won' : '');
   else if (g.league) gymTxt = 'League ' + fmtD(lDist) + ' ' + lBr + ', ' + have + ' of ' + need + ' badges';
   else gymTxt = g.gym.name + ' gym ' + fmtD(dist) + ' ' + br + (hasBadge(state.save, g) ? ' ✓' : '') + ', League ' + fmtD(lDist) + ' ' + lBr;
   document.getElementById('hGym').innerHTML = gymTxt;
@@ -3432,8 +3528,8 @@ document.getElementById('routeSize').addEventListener('click', () => { applyRout
 try { setLayout(localStorage.getItem('scouter-layout') || 'league'); setRouteSize(Number(localStorage.getItem('scouter-route')) || 500); } catch (e) {}
 
 const HANDICAP_STEPS = [[null, 'Off'], [0, 'Equal'], [-1, 'Leader −1'], [-3, 'Leader −3'], [-5, 'Leader −5']];
-document.getElementById('handicap').addEventListener('click', e => { const i = HANDICAP_STEPS.findIndex(x => x[0] === HANDICAP.OFFSET); const next = HANDICAP_STEPS[(i + 1) % HANDICAP_STEPS.length]; HANDICAP.OFFSET = next[0]; e.target.textContent = next[1]; e.target.classList.toggle('on', next[0] != null); try { localStorage.setItem('scouter-handicap', next[0] == null ? '' : String(next[0])); } catch (x) {} updateHud(); });
-try { const hv = localStorage.getItem('scouter-handicap'); if (hv !== null && hv !== '') { HANDICAP.OFFSET = Number(hv); const st = HANDICAP_STEPS.find(x => x[0] === HANDICAP.OFFSET); if (st) { document.getElementById('handicap').textContent = st[1]; document.getElementById('handicap').classList.add('on'); } } } catch (x) {}
+// the level cap is chosen at each serious battle now, not in the menu
+try { localStorage.removeItem('scouter-handicap'); } catch (e) {}   // the old menu setting, retired
 function xpShareText() { const b = document.getElementById('xpShareBtn'); if (!b) return;
   const cur = XPSHARE_STEPS.find(([id]) => id === XPSHARE.mode) || XPSHARE_STEPS[0];
   b.textContent = cur[1]; b.classList.toggle('on', XPSHARE.mode !== 'one');
@@ -3692,7 +3788,7 @@ document.getElementById('guideBtn').addEventListener('click', () => { const d = 
 
 
 // ----- what's new: shown once when the version changes -----
-const APP_VERSION = '114';
+const APP_VERSION = '118';
 // Version notes, newest first. versionNotes(n, since) gives the most recent n, or everything after the
 // version this phone was last on, whichever is the shorter walk back.
 function versionNotes(limit, since) {
@@ -3711,6 +3807,13 @@ function versionNotesHtml(notes) {
     + n.items.map(i => '<div class="noteItem">• ' + i + '</div>').join('') + '</div>').join('') + '</div>';
 }
 const WHATS_NEW = {
+  '118': ['Gym ladders ease off after a big jump now: an 8-level step is always followed by a smaller one, so no three gyms in a row climb more than 21 levels. The eighth gym tops out at Lv 60.'],
+  '117': ['Every region climbs its own ladder now. The first gym is Lv 9 to 14 and each gym after it is 3 to 8 levels higher, with the steps changing as you go: small steps never repeat back to back, big ones never pile up more than three in a row. The eighth gym is Lv 44 to 63, and the League follows just above it, Lv 50 to 68, so there is no sudden wall at the end.'],
+  '116': ['Region levels: a region\'s first gym is Lv 9 to 14, and each badge you win there adds 3 to 8 levels, a steady step for that region. The League is one step past the last gym plus a little, between Lv 50 and 68. Badges from other regions do not count.'],
+  '115': ['Gym leaders\' creatures with a single type now carry a second attack of another type, so one immune creature can no longer wall a whole gym.',
+    'Each region climbs on its own scale now, counting only the badges you win there.',
+    'If your team outlevels a gym leader or another serious opponent, you are asked how to fight before the battle: as you are, or brought down to their level. The old menu setting is gone.',
+    'Regions have new names, built sound by sound rather than from a short list of starts and endings, so far fewer of them share names or sound alike. Your records use the new names too.'],
   '114': ['A badge pool now changes the badges you already hold, not only ones you win afterwards. Your save keeps the original art, so unloading the pool puts it back.',
     'Forget this region works on the region you are standing in: it starts again straight away, from nothing. Before, it refused, and said why somewhere you could not see.',
     'Messages the game shows while a panel is open now appear on top of it. Several had been hidden underneath.'],
@@ -4012,7 +4115,36 @@ function flash(msg, ms = 4000) {
     else top.classList.remove('on'); }
 }
 function hpBar(m) { const f = m.maxHp ? m.hp / m.maxHp : 1; return '<div class="hpb"><div class="hpf" style="width:' + Math.round(f * 100) + '%;background:' + (f > 0.5 ? '#3f9a6a' : f > 0.2 ? '#d8a63a' : '#d8503a') + '"></div></div><small>' + m.hp + '/' + m.maxHp + '</small>'; }
-function startBattle(kind, foes, meta, headline) {
+const CAP_CHOICES = [[null, 'As you are'], [0, 'At their level'], [-3, '3 under them'], [-5, '5 under them']];
+function askLevelCap(kind, foes, meta, headline) {
+  const top = Math.max(...foes.map(f => f.level));
+  const mine = Math.max(0, ...state.save.team.filter(m => m.hp > 0 && PACK.speciesById.has(m.speciesId)).map(m => m.level));
+  const who = (meta && meta.g && meta.g.leader) || (meta && meta.rival && meta.rival.name) || (meta && meta.trainer && meta.trainer.name) || 'They';
+  const t = document.getElementById('toast'); panel.classList.remove('show'); menu.classList.remove('show');
+  document.getElementById('tImg').style.display = 'none';
+  document.getElementById('tSp').textContent = 'How do you want to fight?';
+  document.getElementById('tMeta').innerHTML = esc2(who) + '\u2019s strongest is Lv ' + top + ', and yours is Lv ' + mine + '. '
+    + 'You can go in as you are, or bring your team down to their level for this battle only. Experience still goes to your real levels.';
+  const acts = document.getElementById('tActs'); acts.innerHTML = '';
+  CAP_CHOICES.forEach(([off, label]) => {
+    const cap = off == null ? null : Math.max(1, top + off);
+    if (cap != null && cap >= mine) return;   // a cap above your team would change nothing
+    const b = document.createElement('button');
+    b.textContent = label + (cap != null ? ' (Lv ' + cap + ')' : ' (up to Lv ' + mine + ')');
+    if (off === 0) b.classList.add('on');
+    b.addEventListener('click', () => { t.classList.remove('show'); startBattle(kind, foes, meta, headline, { capChosen: true, offset: off }); });
+    acts.appendChild(b);
+  });
+  t.classList.add('show'); clearTimeout(t._h);
+}
+function startBattle(kind, foes, meta, headline, opts) {
+  // a serious battle against a weaker side asks first; nothing is asked when you are the underdog
+  if (CAPPED_BATTLES.has(kind) && !(opts && opts.capChosen) && state.save) {
+    const top = Math.max(...foes.map(f => f.level));
+    const mine = Math.max(0, ...state.save.team.filter(m => m.hp > 0 && PACK.speciesById.has(m.speciesId)).map(m => m.level));
+    if (mine > top) { askLevelCap(kind, foes, meta, headline); return; }
+  }
+  HANDICAP.OFFSET = (opts && opts.capChosen) ? opts.offset : null;
   // Every fight that is meant to be a test, in any region: gyms, the League, title defences, rematches,
   // tournaments, Champion's Road, the rival, the evil team from grunt to boss, the legend gauntlet, and
   // another player's team. Wild creatures, route trainers and a legend itself are left alone.
@@ -4079,7 +4211,7 @@ document.getElementById('gymBtn').addEventListener('click', () => {
   } else if (d.atGym || state.calloutNow) {
     const team = leaderTeamFor(state.save, g, tb), foes = team.map(e => trainerInstance(e, g.leader + '’s '));
     const aceNm = PACK.speciesById.get(team[team.length - 1].speciesId).name;
-    startBattle('gym', foes, { g, team, aceNm }, leaderLine(g, hasBadge(state.save, g) ? 'rematch' : 'intro', aceNm) + ' ' + g.leader + ' (Lv ' + leaderLevel(tb, g.gx, g.gy) + ') sends out ' + PACK.speciesById.get(foes[0].speciesId).name + '!');
+    startBattle('gym', foes, { g, team, aceNm }, leaderLine(g, hasBadge(state.save, g) ? 'rematch' : 'intro', aceNm) + ' ' + g.leader + ' (Lv ' + leaderLevel(gymIndexFor(state.save, g), g.gx, g.gy) + ') sends out ' + PACK.speciesById.get(foes[0].speciesId).name + '!');
   }
 });
 function currentFoe() { return state.battle.foes[state.battle.foeIdx]; }
@@ -5592,15 +5724,18 @@ const GUIDE = [
 <div class="tip">Shinies appear about once in 1,024 scans, eggs and legends and use their own artwork. Each week every region names one <b>shiny hunt</b> family with odds of 1 in 64 on its routes.</div>
 <p>Caught creatures join your team of six, or the box when the team is full. Each has a personality, a gender, and sometimes a regional variant. They gain XP from battles and evolve by the pack's own rules: level, an item, distance walked with you, time of day, and others. Nickname or pin one in the Team panel. A pinned creature cannot be boxed or traded by accident.</p>` },
   { id: 'battle', title: 'Battles and moves', html: () => `<h3>Choosing a move</h3>
+<p>Gym leaders plan for more than one kind of opponent: any of their creatures with a single type also carries an attack of another type, so one immune creature cannot wall a whole gym.</p>
+<p>Before a gym, the League or another serious battle, if your team is stronger than the other side you are asked how to fight: as you are, at their level, or a few levels under them. It lasts for that battle only, and experience still goes to your real levels. If you are the underdog, nothing is asked.</p>
 <p>Bringing another creature out takes your turn, and the opponent strikes at whoever arrives. The switch buttons sit on their own row so the attacks never move under your thumb, and a fainted creature is not offered.</p>
 <p><b>Experience</b>, in the menu, decides who learns from a win: only the creature that was out when the foe fell, the rest of your team at half, or the whole team in full as a modern Exp. Share does. It is paid the moment each opponent falls rather than at the end, so whoever did the work gets it, and a fainted creature learns nothing either way.</p>
 <p>A creature has up to three attacks and Guard. It strikes with its first type, with its second type if it has one, and with a signature move decided by its strength: Quick Jab always acts first, Heavy Blow deals more damage but lands 70% of the time, and Unleash is one very heavy hit per battle. A taught TM replaces the second-type strike with the TM's type.</p>
 <p>Type advantage applies to every strike, yours and the foe's. Choosing the strike that is super effective against the foe usually decides close fights.</p>
 <div class="tip">When a foe <b>winds up</b>, choose <b>Guard</b>. The incoming hit is cut to a quarter and your next strike counters for double damage. Ignoring wind-ups is the main way a fight at your level is lost.</div>
 <p>Stats follow each species, so a Shuckle takes hits well and barely deals any. A held Plate boosts one type of strike, and a held Mega Stone makes its holder Mega Evolve for the length of a battle. The <b>Auto</b> button plays route trainers for you.</p>
-<p>In the menu, <b>Battle at the leader's level</b> caps your own creatures to the strongest opponent's level, or a few below, in every battle that is meant to be a test: gyms, the League, title defences, master rematches, tournaments, Champion's Road, your rival, the evil team from grunt to boss, the legend gauntlet, and another player's team. Wild creatures, route trainers and legends themselves are left alone.</p>
+
 <p>Their stats scale down for the fight, XP still goes to their real level, and everything returns to normal afterwards. It is what keeps an old region worth walking into once your team has outgrown it.</p>` },
   { id: 'gyms', title: 'Gyms, badges and the League', html: () => `<h3>Earning badges</h3>
+<p>Each region climbs its own ladder, counting only the badges you win there. Its first gym is Lv 9 to 14, and each gym after it is 3 to 8 levels higher. The steps keep changing: a small one never repeats back to back, big ones never come more than three in a row, and after a big 8-level jump the next steps get smaller, so no three gyms in a row climb more than 21 levels. The eighth gym is Lv 44 to 60, the Champion follows a step or so above it at Lv 50 to 68, and the Elite Four sit between them. The order is yours: whichever gym you take next is the next step up, and a rematch meets you where you have got to.</p>
 <p>Each region has eight gyms of eight different types, one in each domain, and a League. Leaders grow with every badge you hold anywhere, and their teams grow from two creatures to five. Each region sets its own starting level, so a new region is its own measure of you. Nobody will tell you a leader's level before you reach the gym.</p>
 <p>Each leader has an <b>ace</b> that evolves as the leader grows. After you beat a leader for the first time you may choose which of their creatures becomes that ace and give it a nickname. It stays with them from then on. The region's Gyms tab keeps every team you have beaten, with the leader's level at the time.</p>
 <p>With all eight badges of a region you can enter its League: four Elite trainers with full teams, then the Champion. Winning makes you Champion of the region, opens its legends, and starts the title defence.</p>
@@ -5985,6 +6120,14 @@ function loadSaveFixups() {
   // everything left and an Ultra Ball could go on a tap meant for an attack. One back, once, for each save.
   if (state.save && !state.save.ballAmends) { state.save.ballAmends = 1; state.save.bag[2] = (state.save.bag[2] || 0) + 1; setTimeout(() => flash('An Ultra Ball has been added to your bag, for any lost to the old battle buttons.', 8000), 1500); }
   liftLevelCap(state.save);
+  { // regions are named from their place on the map; a save only keeps copies, so they follow the current names
+    const nameOf = key => { const m = /:(-?\d+),(-?\d+)$/.exec(String(key || '')); return m ? regionName(+m[1], +m[2]) : null; };
+    Object.entries(state.save.regions || {}).forEach(([k, r]) => { const nm = nameOf(k); if (nm && r) r.name = nm; });
+    Object.entries(state.save.badges || {}).forEach(([k, r]) => { const nm = nameOf(k); if (nm && r) r.region = nm; });
+    (state.save.history || []).forEach(ev => { const nm = ev && nameOf(ev.region); if (nm) ev.name = nm; });
+    Object.values(state.save.seasons || {}).forEach(t => { if (t && t.gx != null) t.region = regionName(t.gx, t.gy); });
+    (state.save.scanLog || []).forEach(e => { if (e && e.lat != null) { try { e.region = describe(e.lat, e.lon).region; } catch (x) {} } });
+  }
   // anything from another pack is quarantined to the box rather than crashing battles
   const known = m => PACK.speciesById.has(m.speciesId);
   const foreign = state.save.team.filter(m => !known(m)); if (foreign.length) { state.save.team = state.save.team.filter(known); state.save.box.push(...foreign); }
