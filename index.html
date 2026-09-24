@@ -435,7 +435,7 @@ const SYL_C = ['to', 'en', 'oh', 'ar', 'os', 'dea', 'ia', 'ova', 'um', 'or', 'is
 // Every hash in the engine is salted with WORLD.SEED, so changing it is a different world on the same streets.
 // The default is the world everyone shares; any other seed is your own, and can be handed to a friend as a code.
 const WORLD_DEFAULT_SEED = 20260903;
-function setWorldSeed(n) { WORLD.SEED = (n >>> 0) || WORLD_DEFAULT_SEED; leaderCache.clear(); if (typeof curveCache !== 'undefined') curveCache.clear(); }
+function setWorldSeed(n) { WORLD.SEED = (n >>> 0) || WORLD_DEFAULT_SEED; leaderCache.clear(); if (typeof curveCache !== 'undefined') curveCache.clear(); if (typeof leaderBlockCache !== 'undefined') leaderBlockCache.clear(); if (typeof townBlockCache !== 'undefined') { townBlockCache.clear(); } }
 const WORLD_CODE_MAX = Math.pow(36, 6);   // six characters, so a code always names exactly one world
 function worldCode(seed) { return (seed >>> 0).toString(36).toUpperCase().padStart(6, '0'); }
 function seedFromCode(code) { const c = String(code || '').trim().toUpperCase(); if (!/^[0-9A-Z]{1,6}$/.test(c)) return null; const v = parseInt(c, 36); return Number.isFinite(v) && v > 0 ? (v >>> 0) : null; }
@@ -749,7 +749,68 @@ function regionGymList(gx, gy) {
   for (let m = 0; m < WORLD.REGION * WORLD.REGION; m++) out.push(isLeagueDomain(gx, gy, m) ? null : idx[k++ % idx.length]);
   return out;
 }
-function gymCell(mx, my) { const h = hash32(mx, my, 441); return { rx: mx * WORLD.MACRO + (h % WORLD.MACRO), ry: my * WORLD.MACRO + ((h >>> 8) % WORLD.MACRO) }; } // a random route of the domain
+const TOWN_WORDS = ['Village', 'Town', 'City', 'Settlement', 'Hamlet', 'Township', 'Borough', 'Crossing', 'Stead', 'Market', 'Hold', 'Heights'];
+const TOWN_WORDS_BY_TYPE = { water: ['Harbour', 'Port', 'Cove'], ice: ['Hold', 'Lodge'], rock: ['Hold', 'Quarry'], ground: ['Quarry', 'Stead'], grass: ['Village', 'Glade'],
+  flying: ['Heights', 'Aerie'], steel: ['Works', 'City'], electric: ['City', 'Works'], fire: ['Forge', 'Town'], dragon: ['Keep', 'Hold'], ghost: ['Hollow', 'Village'],
+  fairy: ['Glade', 'Village'], bug: ['Hamlet', 'Glade'], poison: ['Marsh', 'Borough'], psychic: ['Heights', 'City'], fighting: ['Hold', 'Town'], dark: ['Hollow', 'Borough'], normal: ['Town', 'Village'] };
+// Town names come from one large pool of distinct names per world. Each block of regions has its own
+// stretch of it, used by no other block until blocks are fifteen apart both ways, hands them out
+// without repeating, and skips anything that is already the name of a region around it. So no two towns
+// near each other share a name, or even a first word, and no town is named like the region beside it.
+var townPoolCache = new Map(), townBlockCache = new Map();
+const TOWN_SPAN = 15, TOWN_PER_BLOCK = 240;   // blocks only reuse names when they are 15 blocks apart both ways
+function townPool() {
+  const key = WORLD.SEED;
+  if (townPoolCache.has(key)) return townPoolCache.get(key);
+  const r = rng(hash32(WORLD.SEED, 5202)), seen = new Set(), out = [];
+  const want = TOWN_SPAN * TOWN_SPAN * TOWN_PER_BLOCK;
+  for (let tries = 0; tries < want * 12 && out.length < want; tries++) {
+    const nm = soundName(r); if (!nm || nm.length > 8 || seen.has(nm)) continue;
+    seen.add(nm); out.push(nm);
+  }
+  townPoolCache.set(key, out); return out;
+}
+function blockTowns(bx, by) {
+  const key = WORLD.SEED + ':' + gridTag() + ':' + bx + ',' + by;
+  if (townBlockCache.has(key)) return townBlockCache.get(key);
+  const pool = townPool(), size = TOWN_PER_BLOCK, from = (mod(bx, TOWN_SPAN) + TOWN_SPAN * mod(by, TOWN_SPAN)) * size;
+  // names of regions in and around this block are not available to its towns
+  const taken = new Set();
+  for (let ry = (by - 1) * NAME_BLOCK; ry < (by + 2) * NAME_BLOCK; ry++) for (let rx = (bx - 1) * NAME_BLOCK; rx < (bx + 2) * NAME_BLOCK; rx++) taken.add(regionName(rx, ry));
+  const out = new Map(), R = WORLD.REGION;
+  let k = hash32(bx, by, 5203) % Math.max(1, size);
+  for (let ry = by * NAME_BLOCK; ry < (by + 1) * NAME_BLOCK; ry++) for (let rx = bx * NAME_BLOCK; rx < (bx + 1) * NAME_BLOCK; rx++) {
+    for (let i = 0; i < R * R; i++) {
+      const mx = rx * R + (i % R), my = ry * R + Math.floor(i / R);
+      let nm = null;
+      for (let t = 0; t < size && !nm; t++) { const cand = pool[from + ((k + t) % size)]; if (!taken.has(cand)) { nm = cand; k = (k + t + 1) % size; } }
+      if (!nm) nm = pool[from + (k % size)];
+      taken.add(nm); out.set(mx + ',' + my, nm);
+    }
+  }
+  townBlockCache.set(key, out); return out;
+}
+function gymTownName(g) {
+  if (!g || g.league) return null;
+  const base = blockTowns(floorDiv(g.gx, NAME_BLOCK), floorDiv(g.gy, NAME_BLOCK)).get(g.mx + ',' + g.my) || regionName(g.gx, g.gy);
+  const flavour = TOWN_WORDS_BY_TYPE[g.type] || [], words = flavour.concat(TOWN_WORDS);
+  return base + ' ' + words[hash32(g.mx, g.my, 5201) % words.length];
+}
+// how a route is named: a gym's route is its town, every other route keeps its number
+function routeLabel(d) { return d.atGym && d.gym ? gymTownName(d.gym) : 'Route ' + d.routeNo; }
+function gymCell(mx, my) { const h = hash32(mx, my, 441); return { rx: mx * WORLD.MACRO + (h % WORLD.MACRO), ry: my * WORLD.MACRO + ((h >>> 8) % WORLD.MACRO) }; } // a random route of the domain (the League's, fixed)
+// A gym moves each week to another route of its own domain, and not to the one it was on last week.
+var GYM_WEEK = null;   // tests can pin the week; the game reads the clock
+function gymWeek() { return GYM_WEEK != null ? GYM_WEEK : weekIndexOf(Date.now()); }
+function gymCellFor(mx, my, week) {
+  // each domain walks its own shuffled order of its routes, so the gym is somewhere new every week and
+  // visits every route in turn before any comes round again
+  const n = WORLD.MACRO * WORLD.MACRO, r = rng(hash32(mx, my, 442)), order = [];
+  for (let i = 0; i < n; i++) order.push(i);
+  for (let i = n - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
+  const idx = order[mod(week + (hash32(mx, my, 443) % n), n)];
+  return { rx: mx * WORLD.MACRO + (idx % WORLD.MACRO), ry: my * WORLD.MACRO + Math.floor(idx / WORLD.MACRO) };
+}
 function leagueCell(gx, gy) { // the League sits on the gym route of its own domain (no gym there)
   const li = leagueIndexOf(gx, gy);
   return gymCell(gx * WORLD.REGION + li % WORLD.REGION, gy * WORLD.REGION + Math.floor(li / WORLD.REGION));
@@ -781,31 +842,76 @@ const TYPE_NAMES = {
 const GENERIC_NAMES = ['Adaora', 'Bashir', 'Cato', 'Dilnaz', 'Emeric', 'Farah', 'Gulzar', 'Hiro', 'Ilse', 'Jamal', 'Kenji', 'Laila', 'Mattias', 'Noor', 'Orla', 'Pavel', 'Qasim', 'Rania', 'Soren', 'Tariq', 'Umi', 'Vera', 'Wes', 'Xenia', 'Yara', 'Zane'];
 function leaderPool(g) { const own = g.leaders.filter(n => n && n !== 'Leader'); if (own.length >= NAME_POOL_MIN) return own; const extra = (TYPE_NAMES[g.type] || GENERIC_NAMES).filter(n => !own.includes(n)); return own.concat(extra); }
 const NAME_BLOCK = 5; // regions per side of a name-uniqueness block (5×5 regions ≈ 10 km); a leader name of a given type appears at most once per block
+// Leader names. The pack's own names and the type's themed names come first; behind them sits a large
+// pool of generated given names, so a type never runs short. Names are handed out block by block, and no
+// name is used twice anywhere in a block, whatever the type, so neighbours never share a leader's name.
+const LEADER_ONSETS = ['', '', 'b', 'br', 'c', 'd', 'f', 'g', 'h', 'j', 'k', 'l', 'm', 'n', 'p', 'r', 's', 'sh', 't', 'th', 'v', 'w', 'z', 'ch', 'st', 'tr', 'fr', 'gr', 'dr', 'qu', 'l', 'm', 'r'];
+const LEADER_VOWELS = ['a', 'a', 'a', 'e', 'e', 'i', 'i', 'o', 'o', 'u', 'ai', 'ia', 'ou'];
+const LEADER_ENDS = ['a', 'a', 'ia', 'ina', 'elle', 'ette', 'ara', 'ora', 'is', 'os', 'us', 'an', 'en', 'in', 'on', 'yn', 'wyn', 'ric', 'ard', 'ley', 'ton', 'ven', 'mir', 'dra', 'sa', 'na', 'la', 'ro', 'o', 'e', 'ey', 'lo', 'ric', 'mund', 'gar', 'bel', 'cia', 'dor', 'lin', 'ius', 'ika', 'ari', 'ane'];
+var genLeaderCache = new Map();
+function generatedLeaderNames(type) {
+  if (genLeaderCache.has(type)) return genLeaderCache.get(type);
+  const r = rng(hash32(strHash(type), 5101)), seen = new Set(), out = [];
+  for (let tries = 0; tries < 8000 && out.length < 200; tries++) {
+    const sylls = r() < 0.55 ? 1 : 2;
+    let s = '';
+    for (let q = 0; q < sylls; q++) s += LEADER_ONSETS[Math.floor(r() * LEADER_ONSETS.length)] + LEADER_VOWELS[Math.floor(r() * LEADER_VOWELS.length)] + (q < sylls - 1 && r() < 0.3 ? ['n', 'r', 'l', 's'][Math.floor(r() * 4)] : '');
+    s += LEADER_ENDS[Math.floor(r() * LEADER_ENDS.length)];
+    if (s.length < 3 || s.length > 8 || /([a-z])\1\1/.test(s) || /[aeiouy]{3}/.test(s) || /(aa|ii|uu|yy|ee|oo)/.test(s) || /q(?!u)/.test(s) || /[^aeiouy]{3}/.test(s.replace(/(sh|th|ch|st|tr|fr|gr|dr|br|kl|nd)/g, 'X')) || /[aeiou]{2}[aeiou]*a$/.test(s) || NAME_WORDS.test(s)) continue;
+    const nm = s.charAt(0).toUpperCase() + s.slice(1);
+    if (!seen.has(nm)) { seen.add(nm); out.push(nm); }
+  }
+  genLeaderCache.set(type, out); return out;
+}
+// every name belongs to exactly one type, so two types can never hand out the same name side by side
+var leaderPoolCache = new Map();
+function leaderFullPool(type) {
+  const key = ((PACK.meta && PACK.meta.name) || '') + ':' + type;
+  if (leaderPoolCache.has(key)) return leaderPoolCache.get(key);
+  const owner = new Map();
+  PACK.gyms.forEach(g => { leaderPool(g).forEach(n => { if (!owner.has(n)) owner.set(n, g.type); }); });
+  PACK.gyms.forEach(g => { generatedLeaderNames(g.type).forEach(n => { if (!owner.has(n)) owner.set(n, g.type); }); });
+  PACK.gyms.forEach(g => {
+    const k = ((PACK.meta && PACK.meta.name) || '') + ':' + g.type;
+    const own = leaderPool(g).concat(generatedLeaderNames(g.type)).filter((n, i, a) => owner.get(n) === g.type && a.indexOf(n) === i);
+    leaderPoolCache.set(k, own);
+  });
+  return leaderPoolCache.get(key) || [];
+}
+var leaderBlockCache = new Map();   // var: setWorldSeed, earlier in the file, may clear it before this line runs
+function blockLeaders(bx, by) {
+  const bkey = WORLD.SEED + ':' + gridTag() + ':' + ((PACK.meta && PACK.meta.name) || '') + ':' + bx + ',' + by;
+  if (leaderBlockCache.has(bkey)) return leaderBlockCache.get(bkey);
+  const used = new Set(), byRegion = new Map(), offsets = {};
+  for (let ry = by * NAME_BLOCK; ry < (by + 1) * NAME_BLOCK; ry++) for (let rx = bx * NAME_BLOCK; rx < (bx + 1) * NAME_BLOCK; rx++) {
+    const list = regionGymList(rx, ry), out = new Array(list.length).fill(null);
+    for (let mi = 0; mi < list.length; mi++) {
+      if (list[mi] === null) continue;
+      const g = PACK.gyms[list[mi]];
+      // the type's own and themed names first, then the generated ones, each block starting somewhere different
+      const pool = leaderFullPool(g.type);
+      // nine slices, and blocks next to each other (always different mod 3 in one direction) never share one
+      const slice = mod(bx, 3) + 3 * mod(by, 3), size = Math.max(1, Math.floor(pool.length / 9)), from = slice * size;
+      if (offsets[g.type] == null) offsets[g.type] = hash32(bx, by, strHash(g.type), 331) % size;
+      let name = null;
+      for (let t = 0; t < size; t++) { const cand = pool[from + ((offsets[g.type] + t) % size)]; if (!used.has(cand)) { name = cand; offsets[g.type] = (offsets[g.type] + t + 1) % size; break; } }
+      if (!name) for (let t = 0; t < pool.length && !name; t++) { const cand = pool[(from + t) % pool.length]; if (!used.has(cand)) name = cand; }   // a slice ran dry
+      if (!name) name = pool[from % pool.length];
+      used.add(name); out[mi] = name;
+    }
+    byRegion.set(rx + ',' + ry, out);
+  }
+  leaderBlockCache.set(bkey, byRegion); return byRegion;
+}
 function regionLeaders(gx, gy) { // array indexed by macro index → leader name, or null for the league
   const key = regionKey(gx, gy); if (leaderCache.has(key)) return leaderCache.get(key);
-  const bx = floorDiv(gx, NAME_BLOCK), by = floorDiv(gy, NAME_BLOCK);
-  const list = regionGymList(gx, gy), out = new Array(list.length).fill(null), used = new Set();
-  for (let mi = 0; mi < list.length; mi++) {
-    if (list[mi] === null) continue;
-    const g = PACK.gyms[list[mi]], pool = leaderPool(g);
-    // deterministic order of this type's gyms across the block: scan regions row-major, gyms by macro index
-    let ordinal = 0, found = false;
-    for (let ry = by * NAME_BLOCK; ry < (by + 1) * NAME_BLOCK && !found; ry++) for (let rx = bx * NAME_BLOCK; rx < (bx + 1) * NAME_BLOCK && !found; rx++) {
-      const l2 = regionGymList(rx, ry);
-      for (let m2 = 0; m2 < l2.length; m2++) { if (l2[m2] !== list[mi]) continue; if (rx === gx && ry === gy && m2 === mi) { found = true; break; } ordinal++; }
-    }
-    const r = rng(hash32(bx, by, strHash(g.type), 331)); const idx = pool.map((_, i) => i);
-    for (let i = idx.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [idx[i], idx[j]] = [idx[j], idx[i]]; }
-    let k = ordinal, name = pool[idx[k % idx.length]], tries = 0;
-    while (used.has(name) && tries++ < idx.length) { k++; name = pool[idx[k % idx.length]]; }   // never two leaders of one name in the same region
-    used.add(name); out[mi] = name;
-  }
+  const out = blockLeaders(floorDiv(gx, NAME_BLOCK), floorDiv(gy, NAME_BLOCK)).get(gx + ',' + gy) || [];
   leaderCache.set(key, out); return out;
 }
 function gymOf(mx, my) {
   const { gx, gy } = regionOf(mx, my);
   const mi = macroIndex(mx, my);
-  const cell = gymCell(mx, my);
+  const cell = isLeagueDomain(gx, gy, mi) ? gymCell(mx, my) : gymCellFor(mx, my, gymWeek());
   if (isLeagueDomain(gx, gy, mi)) return { league: true, gymIndex: null, gym: null, type: null, leader: 'Champion', leaderImage: null, badge: null, cell, mx, my, gx, gy, mi };
   const gi = regionGymList(gx, gy)[mi], g = PACK.gyms[gi];
   const leader = regionLeaders(gx, gy)[mi];
@@ -1835,7 +1941,8 @@ function trainersOn(rx, ry, teamLevel, badges, now) {
   const hab = PACK.habitats[routeHabitat(rx, ry)];
   const n = 1 + Math.floor(r() * 3), out = [];
   for (let i = 0; i < n; i++) {
-    const level = Math.max(2, Math.min(100, Math.round(teamLevel * 0.8 + badges * 2 + Math.floor(r() * 7) - 3)));
+    const avg = Math.max(2, Math.round(teamLevel)), band = lv => Math.max(1, Math.min(100, lv));
+    const level = band(avg - 1 + Math.floor(r() * 4));   // your team's average, from one under to two over
     const size = 1 + Math.floor(r() * 4);   // one to four, evenly, decided when the trainer is generated
     const side = WORLD.MACRO * WORLD.REGION, gx0 = floorDiv(rx, side), gy0 = floorDiv(ry, side);
     const team = [];
@@ -1843,7 +1950,8 @@ function trainersOn(rx, ry, teamLevel, badges, now) {
       // most of a trainer's team is local; the rest is from any route in this region, near or far
       let h = hab;
       if (r() < 0.45) { const ax = gx0 * side + Math.floor(r() * side), ay = gy0 * side + Math.floor(r() * side); h = PACK.habitats[routeHabitat(ax, ay)] || hab; }
-      const m = habitatMember(h, Math.max(2, level - Math.floor(r() * 3)), r); team.push({ speciesId: m.id, level: Math.max(m.min, Math.min(m.max, level - Math.floor(r() * 3))) }); }
+      const want = band(avg - 1 + Math.floor(r() * 4));   // each creature in the same band as its trainer
+      const m = habitatMember(h, want, r); team.push({ speciesId: m.id, level: want }); }
     const types = []; team.forEach(t => (PACK.speciesById.get(t.speciesId) || { types: [] }).types.forEach(ty => { if (!types.includes(ty)) types.push(ty); }));
     const gender = r() < 0.5 ? 0 : 1;
     const cls = pickTrainerClass(level, gender, types, team.map(t => t.speciesId), r);
@@ -3003,7 +3111,7 @@ function updateHud() {
   if (state.save && positionTrusted()) { const rk = d.rx + ',' + d.ry; if (rk !== state.lastRouteKey) { state.lastRouteKey = rk; const t = touchRoute(state.save, d, Date.now()); if (t.newRegion) flash('Welcome to ' + d.region + (regionRecord(state.save, d.gx, d.gy).visits > 1 ? ', visit ' + regionRecord(state.save, d.gx, d.gy).visits : ', first visit'), 3500); persistSave(); } }
   const g = d.gym;
   document.getElementById('hRegion').textContent = d.region;
-  document.getElementById('hRouteNo').textContent = 'Route ' + d.routeNo + (WORLD.LAYOUT === 'dense' ? '' : ', ' + (g.league ? 'League domain' : g.gym.name + ' domain'));
+  document.getElementById('hRouteNo').textContent = routeLabel(d) + (WORLD.LAYOUT === 'dense' ? '' : ', ' + (g.league ? 'League domain' : g.gym.name + ' domain'));
   document.getElementById('hRoute').textContent = d.habitatName.replace(/ Family$/, ' family');
   const lcC = cellCenter(d.leagueCell.rx, d.leagueCell.ry), lDist = haversineM(state.lat, state.lon, lcC.lat, lcC.lon), lBr = compass(bearingDeg(state.lat, state.lon, lcC.lat, lcC.lon));
   const tb = state.save ? badgeCount(state.save) : 0, have = state.save ? regionBadgeCount(state.save, g.gx, g.gy) : 0, need = leagueBadgesNeeded();
@@ -3277,7 +3385,7 @@ function say(text) {
 function routeNote(d) {
   const parts = [];
   if (d.region !== ROUTE_VOICE.lastRegion) { parts.push('Entering ' + d.region + '.'); ROUTE_VOICE.lastRegion = d.region; }
-  parts.push('Route ' + d.routeNo + '.');
+  parts.push(routeLabel(d) + '.');
   const fam = PACK.habitats[d.habitat]; if (fam) parts.push(fam.name.replace(/ Family$/i, '') + (/ Family$/i.test(fam.name) ? ' family here.' : ' here.'));
   if (d.atLeague) parts.push('The League is on this route.');
   else if (d.atGym) parts.push(d.gym.gym.name + ' gym here, ' + d.gym.leader + '.');
@@ -3788,7 +3896,7 @@ document.getElementById('guideBtn').addEventListener('click', () => { const d = 
 
 
 // ----- what's new: shown once when the version changes -----
-const APP_VERSION = '118';
+const APP_VERSION = '121';
 // Version notes, newest first. versionNotes(n, since) gives the most recent n, or everything after the
 // version this phone was last on, whichever is the shorter walk back.
 function versionNotes(limit, since) {
@@ -3807,6 +3915,12 @@ function versionNotesHtml(notes) {
     + n.items.map(i => '<div class="noteItem">• ' + i + '</div>').join('') + '</div>').join('') + '</div>';
 }
 const WHATS_NEW = {
+  '121': ['Route trainers follow your team now, not your badges: they and every creature they carry are from one level under your team\'s average to two over it.'],
+  '120': ['Gym towns never share a name now: no two anywhere near each other, not even the first word, and none named like the region around it.'],
+  '119': ['Fixed: after losing to a route\'s trainers, they vanished until you walked somewhere else. They stay now, ready for another go once you have healed.',
+    'Gym leaders have far more names, and no two leaders anywhere near each other share one.',
+    'Gyms move once a week to another route in their own domain, working round every route of it in turn. The League stays put.',
+    'The route a gym stands on is a settlement now, a Village, Town, City, Harbour and so on, named for that gym. The name goes with the gym when it moves.'],
   '118': ['Gym ladders ease off after a big jump now: an 8-level step is always followed by a smaller one, so no three gyms in a row climb more than 21 levels. The eighth gym tops out at Lv 60.'],
   '117': ['Every region climbs its own ladder now. The first gym is Lv 9 to 14 and each gym after it is 3 to 8 levels higher, with the steps changing as you go: small steps never repeat back to back, big ones never pile up more than three in a row. The eighth gym is Lv 44 to 63, and the League follows just above it, Lv 50 to 68, so there is no sudden wall at the end.'],
   '116': ['Region levels: a region\'s first gym is Lv 9 to 14, and each badge you win there adds 3 to 8 levels, a steady step for that region. The League is one step past the last gym plus a little, between Lv 50 and 68. Badges from other regions do not count.'],
@@ -4657,7 +4771,8 @@ function renderNeighbours(d) {
 function currentTrainers(d) { return trainersOn(d.rx, d.ry, teamLevel(state.save), badgeCount(state.save), Date.now()); }
 function renderTrainersBar(d) {
   const bar = document.getElementById('trainersBar');
-  if (state.battle || !state.save) { bar.innerHTML = ''; return; }
+  // emptied during a battle, so forget what was drawn: otherwise a loss (which changes nothing) leaves it empty
+  if (state.battle || !state.save) { bar.innerHTML = ''; bar.dataset.key = ''; return; }
   const day = dayIndex(Date.now()), tb = badgeCount(state.save);
   const ch = d.atGym ? challengerAt(state.save, d.gym, day, tb) : null;
   let cc = d.atLeague ? championChallenger(state.save, d.gym, contendSlot(Date.now())) : null;
@@ -5701,7 +5816,7 @@ const GUIDE = [
 <p>Under <b>Progress</b>, <b>Your week</b> shares as a picture: the distance you walked, what you did, and where. A creature with a region's own form has a <b>Shade</b> button in the Collection, for choosing among the colours its typing allows.</p>
 <p>The <b>World</b> tab also keeps the last twenty places you scanned, what appeared there and how far off it is, with <b>Directions</b> back to any of them, so a good spot is never lost. Under <b>Collection</b>, a creature can be filed into a group you name, and tabs above the box show one group at a time.</p>
 <p>The Team panel's <b>World</b> tab lists every region you have visited. Sort them by last visit, name, distance, badges or routes, and filter by first letter or by the direction they lie in. A region's details page has <b>Forget this region</b>, for places you passed through once and will not return to.</p>
-<p>Trainers on a route carry creatures from across the whole region, not only the route they stand on, so beating one is often the first time you see a family you have not walked to. Their teams run from one to four, and their titles suit their level: school kids, campers and bug catchers early, Ace Trainers, Beauties and Scientists later, Veterans and Gentlemen at the top. Titles and their sprites come from the pack, so a different pack brings its own.</p>
+<p>Trainers on a route carry creatures from across the whole region, not only the route they stand on, so beating one is often the first time you see a family you have not walked to. Their teams run from one to four, and they keep pace with you rather than your badges: a trainer and every creature they carry are from one level under your team's average to two over it. Their titles suit their level: school kids, campers and bug catchers early, Ace Trainers, Beauties and Scientists later, Veterans and Gentlemen at the top. Titles and their sprites come from the pack, so a different pack brings its own.</p>
 <p>Trainer sprites stand on routes. Their chips above the map start a battle. Coloured squares are habitats, one family per route, and the outline around a domain is the colour of its gym's type. Tap any marker for its name and status.</p>
 <p>The map frames the whole route between the chips and the strip below, so nothing covers it. Pinch to zoom freely, and <b>Follow me</b> returns to your route. Zoomed far out, every region in view is named with your badge count in it.</p>` },
   { id: 'directions', title: 'Directions', html: () => `<h3>Getting there</h3>
@@ -5735,6 +5850,7 @@ const GUIDE = [
 
 <p>Their stats scale down for the fight, XP still goes to their real level, and everything returns to normal afterwards. It is what keeps an old region worth walking into once your team has outgrown it.</p>` },
   { id: 'gyms', title: 'Gyms, badges and the League', html: () => `<h3>Earning badges</h3>
+<p>Gyms don't stay in one place. Once a week each moves to another route in its own domain, working round all of them in turn, so your nearest gym may be a street or two further off than last week. The route a gym stands on is a settlement with its own name, a Village, Town, City, Harbour and so on, and that name goes with the gym. The League stays where it is.</p>
 <p>Each region climbs its own ladder, counting only the badges you win there. Its first gym is Lv 9 to 14, and each gym after it is 3 to 8 levels higher. The steps keep changing: a small one never repeats back to back, big ones never come more than three in a row, and after a big 8-level jump the next steps get smaller, so no three gyms in a row climb more than 21 levels. The eighth gym is Lv 44 to 60, the Champion follows a step or so above it at Lv 50 to 68, and the Elite Four sit between them. The order is yours: whichever gym you take next is the next step up, and a rematch meets you where you have got to.</p>
 <p>Each region has eight gyms of eight different types, one in each domain, and a League. Leaders grow with every badge you hold anywhere, and their teams grow from two creatures to five. Each region sets its own starting level, so a new region is its own measure of you. Nobody will tell you a leader's level before you reach the gym.</p>
 <p>Each leader has an <b>ace</b> that evolves as the leader grows. After you beat a leader for the first time you may choose which of their creatures becomes that ace and give it a nickname. It stays with them from then on. The region's Gyms tab keeps every team you have beaten, with the leader's level at the time.</p>
@@ -6312,7 +6428,8 @@ setView(osm.ok ? 'map' : 'grid');
 fitCanvas();
 updateGpsBtn();
 requestAnimationFrame(tick);
-restorePack().then(async () => { wakeAcquire(); await nativeSaveRestore(); setTimeout(cloudCheck, 2500); renderTeam(); if (!state.save.starterChosen) showIntro(offerStarter); else setTimeout(() => { if (!offerHomeScreen(false)) showWhatsNew(); }, 900); if (navigator.geolocation && !state.sim) gpsStart(false); });
+restorePack().then(async () => { setTimeout(() => { try { townPool(); } catch (e) {} }, 2500);   // build town names in the background, not at the first gym
+  wakeAcquire(); await nativeSaveRestore(); setTimeout(cloudCheck, 2500); renderTeam(); if (!state.save.starterChosen) showIntro(offerStarter); else setTimeout(() => { if (!offerHomeScreen(false)) showWhatsNew(); }, 900); if (navigator.geolocation && !state.sim) gpsStart(false); });
 </script>
 </body>
 </html>
