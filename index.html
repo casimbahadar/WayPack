@@ -978,11 +978,12 @@ function habitatMember(hab, level, rand) {
 function encounter(lat, lon, teamLevel, badges, seed) {
   const d = describe(lat, lon);
   const r = rng(hash32(d.rx, d.ry, seed | 0, 808));
-  const noise = Math.floor(r() * 6) - 2;
-  let level = Math.max(2, Math.min(100, Math.round(teamLevel * 0.8 + badges * 2 + noise)));
+  // wild creatures keep pace with your team, not your badges: its average, two either side
+  const avg = Math.max(2, Math.round(teamLevel));
+  let level = Math.max(2, Math.min(100, avg - 2 + Math.floor(r() * 5)));
   { // a supporter's chosen band for wild creatures: it narrows the range, and never lifts the ceiling
     const band = (typeof donorOn === 'function') && donorOn('levels') ? DONOR.levels : null;
-    if (band) { const ceiling = Math.max(2, Math.min(100, Math.round(teamLevel * 0.8 + badges * 2 + 3)));
+    if (band) { const ceiling = Math.max(2, Math.min(100, avg + 2));
       const lo = Math.max(2, Math.min(band.min, ceiling)), hi = Math.max(lo, Math.min(band.max, ceiling));
       level = lo + Math.floor(r() * (hi - lo + 1)); } }
   const legRoll = Math.floor(r() * WORLD.LEGENDARY_ODDS);
@@ -3896,7 +3897,7 @@ document.getElementById('guideBtn').addEventListener('click', () => { const d = 
 
 
 // ----- what's new: shown once when the version changes -----
-const APP_VERSION = '121';
+const APP_VERSION = '122';
 // Version notes, newest first. versionNotes(n, since) gives the most recent n, or everything after the
 // version this phone was last on, whichever is the shorter walk back.
 function versionNotes(limit, since) {
@@ -3915,6 +3916,7 @@ function versionNotesHtml(notes) {
     + n.items.map(i => '<div class="noteItem">• ' + i + '</div>').join('') + '</div>').join('') + '</div>';
 }
 const WHATS_NEW = {
+  '122': ['Wild creatures follow your team now, not your badges: within two levels of your team\'s average, either way. Before, every badge you held anywhere added two levels to everything you met.'],
   '121': ['Route trainers follow your team now, not your badges: they and every creature they carry are from one level under your team\'s average to two over it.'],
   '120': ['Gym towns never share a name now: no two anywhere near each other, not even the first word, and none named like the region around it.'],
   '119': ['Fixed: after losing to a route\'s trainers, they vanished until you walked somewhere else. They stay now, ready for another go once you have healed.',
@@ -5315,7 +5317,7 @@ function supporterAny() { return SUPPORTER.items.length > 0; }
 const DONOR_ITEMS = {
   charm:   { name: 'Shiny Charm',   desc: 'Shinies at 1 in 125 instead of 1 in 512. Anything found with it is marked and cannot be traded.' },
   hold:    { name: 'Shiny Lock',    desc: 'A shiny never flees before you have had your throws.' },
-  levels:  { name: 'Level Selector', desc: 'Choose the level band wild creatures appear at, up to what your badges already allow.' },
+  levels:  { name: 'Level Selector', desc: 'Choose the level band wild creatures appear at, up to two above your team\'s average.' },
   incub:   { name: 'Incubator',      desc: 'Eggs hatch on half the walking.' },
   frames:  { name: 'Photo frames',   desc: 'A set of frames for your photos.' },
   twopins: { name: 'Second anchor',  desc: 'Two pins can be starting points, and you can travel between them.' },
@@ -5902,7 +5904,7 @@ const GUIDE = [
 <p><b>Backup</b>, under Data in the menu, writes the playthrough you are in to a file, and <b>Import</b> reads one back on any phone. That file is yours: it needs no account and no network.</p>
 <h3>Supporters</h3>
 <p>WayPack is free and stays free. Running the server costs money, and anyone who chips in towards it can have extras switched on: they are set against your trainer name and friend code, or entered as a code, both under Online. There are no ranks or bundles, only the individual things you asked for.</p>
-<p>A tier unlocks a few switches for your own game. <b>Shiny Charm</b> finds shinies at 1 in 125 rather than 1 in 512. <b>Shiny Lock</b> stops a shiny slipping away before you have thrown. The <b>Level Selector</b> picks the band wild creatures appear at, and cannot lift the ceiling your badges set.</p>
+<p>A tier unlocks a few switches for your own game. <b>Shiny Charm</b> finds shinies at 1 in 125 rather than 1 in 512. <b>Shiny Lock</b> stops a shiny slipping away before you have thrown. The <b>Level Selector</b> picks the band wild creatures appear at, and cannot go higher than two above your team's average.</p>
 <p>And four more: <b>route notes</b> pin a line of your own to a route and show it whenever you stand there, a <b>fourth egg</b> slot, <b>make a rest stop</b> turns one landmark a week into a rest stop for good, and <b>choose a starter</b> lets a new playthrough begin with any first stage in the pack rather than the three a region offers.</p>
 <p>Two more: <b>two worlds at hand</b> pins a pair of worlds so you can flip between them in a tap, and <b>offline region</b> downloads a region's places and its map tiles before you go somewhere without data, telling you the size first and keeping whatever came down if you stop it.</p>
 <p>A tier also unlocks, in rough order: an <b>Incubator</b> (eggs on half the walking), <b>photo frames</b>, a <b>second anchor</b> so two pins can both be starting points and travelled between, a <b>second look</b> at one landmark a day, a <b>gym callout</b> that brings the domain's leader to your route once a day, and <b>legend watch</b>, which lets you choose which of a region's legends is watched that week.</p>

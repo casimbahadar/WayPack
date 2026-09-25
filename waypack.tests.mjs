@@ -141,7 +141,7 @@ const randLat = () => -70 + R() * 140, randLon = () => -180 + R() * 360;
   }
   check('0 legendaries with 0 badges', legLow === 0, legLow + ' / ' + N);
   check('scans never produce legendaries any more (they are Champion events)', legHigh === 0, legHigh + ' / ' + N);
-  check('mean level rises with badges', lvl8 / N > lvl0 / N + 8, (lvl0 / N).toFixed(1) + ' → ' + (lvl8 / N).toFixed(1));
+  check('wild levels do not rise with badges: the same team meets the same levels with none or eight', Math.abs(lvl8 / N - lvl0 / N) < 0.5, (lvl0 / N).toFixed(1) + ' → ' + (lvl8 / N).toFixed(1));
 }
 
 
@@ -2126,6 +2126,14 @@ for (const [label, E, layout] of [['GMS domains', GMS, 'league'], ['GMS dense', 
   });
   check('a route trainer and every creature they carry sit from one under your team average to two over', bandOk, members + ' creatures checked');
   check('badges have no say in a route trainer\'s level', ignoresBadges);
+}
+
+
+// ---------- 102. v122: wild creatures keep pace with your team ----------
+{
+  let out = 0, total = 0;
+  [8, 15.5, 18, 40, 70].forEach(avg => { for (let i = 0; i < 800; i++) { const e = GMS.encounter(43.40 + (i % 80) * 0.002, -80.55 + Math.floor(i / 80) * 0.002, avg, 7, i); if (!e.species || e.legendary) continue; total++; if (e.level < Math.round(avg) - 2 || e.level > Math.round(avg) + 2) out++; } });
+  check('a wild creature is within two levels of your team average, either way', out === 0, total + ' encounters');
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
